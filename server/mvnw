@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+set -eu
+
+# Chronos 轻量 Maven Wrapper。
+# CI 或 macOS/Linux 开发机执行 ./server/mvnw test 时，会自动下载固定版本 Maven。
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+WRAPPER_DIR="$SCRIPT_DIR/.mvn/wrapper"
+MAVEN_VERSION="3.9.9"
+MAVEN_HOME="$WRAPPER_DIR/apache-maven-$MAVEN_VERSION"
+MAVEN_ZIP="$WRAPPER_DIR/apache-maven-$MAVEN_VERSION-bin.zip"
+MAVEN_URL="https://archive.apache.org/dist/maven/maven-3/$MAVEN_VERSION/binaries/apache-maven-$MAVEN_VERSION-bin.zip"
+MAVEN_SETTINGS="$SCRIPT_DIR/.mvn/settings.xml"
+
+mkdir -p "$WRAPPER_DIR"
+
+if [ ! -x "$MAVEN_HOME/bin/mvn" ]; then
+  if [ ! -f "$MAVEN_ZIP" ]; then
+    if command -v curl >/dev/null 2>&1; then
+      curl -L "$MAVEN_URL" -o "$MAVEN_ZIP"
+    elif command -v wget >/dev/null 2>&1; then
+      wget "$MAVEN_URL" -O "$MAVEN_ZIP"
+    else
+      echo "需要 curl 或 wget 下载 Maven。" >&2
+      exit 1
+    fi
+  fi
+  unzip -q "$MAVEN_ZIP" -d "$WRAPPER_DIR"
+fi
+
+exec "$MAVEN_HOME/bin/mvn" -s "$MAVEN_SETTINGS" -f "$SCRIPT_DIR/pom.xml" "$@"
+

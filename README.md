@@ -1,0 +1,62 @@
+# Chronos 智能任务管理系统
+
+Chronos 是面向学生和自我提升人群的智能学习任务管理系统。当前仓库是“开发引导型脚手架”：它提供前端、后端、数据库和文档的基础结构，帮助团队按既有需求资料继续开发，不在初始版本中实现完整业务逻辑。
+
+## 项目定位
+
+- 核心工具能力：学习项目、任务管理、今日看板、本地持久化、基础统计和同步提示。
+- AI 增强能力：目标拆解、任务树预览、阶段复盘和优化建议，必须以草稿方式展示，用户确认后才落库。
+- 工程边界：当前不引入 Redis、RabbitMQ、K8s、真实 LLM 调用或复杂冲突合并算法，先保证课程项目能按 P0/P1 目标推进。
+
+## 目录结构
+
+```text
+.
+├── client/                  # Electron + React + Vite 前端框架
+├── server/                  # Spring Boot 后端框架
+├── database/
+│   ├── mysql/schema.sql     # 云端 MySQL 建表草案
+│   └── sqlite/schema.sql    # 本地 SQLite 建表草案
+├── docs/                    # 架构、接口、数据库和开发指南
+├── .github/workflows/ci.yml # 持续集成检查入口
+├── .env.example             # 环境变量模板
+└── record.md                # 每次改动记录
+```
+
+## 开发环境
+
+- Node.js 20 LTS 或更高版本。
+- npm 10 或更高版本。
+- JDK 17 或更高版本。
+- Git。
+
+本仓库使用 npm workspace 管理前端；后端使用 `server/mvnw.cmd` 或 `server/mvnw` 下载并运行 Maven，因此本机无需提前安装 Maven。
+
+## 快速启动
+
+```powershell
+# 安装前端依赖
+npm install
+
+# 启动前端 Web 开发服务器
+npm run dev --workspace client
+
+# 启动 Electron 桌面壳
+npm run electron:dev --workspace client
+
+# 运行后端测试
+.\server\mvnw.cmd test
+
+# 启动后端服务
+.\server\mvnw.cmd spring-boot:run
+```
+
+## 开发路线
+
+1. 前端先补齐页面交互：今日看板、项目、任务、日历、AI 拆解、统计、设置。
+2. 后端先实现认证、项目、任务和健康检查接口，再逐步接入统计、同步和 AI 草稿接口。
+3. 数据库先使用 SQLite/MySQL 脚本统一核心字段，后续根据实体和接口演进补迁移工具。
+4. 每次变更都更新 `record.md`，记录文件范围、目的和验证结果。
+
+更多说明见 `docs/architecture.md`、`docs/api.md`、`docs/database.md` 和 `docs/development-guide.md`。
+

@@ -1,0 +1,14 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: chronos-server
+
+chronos:
+  ai:
+    provider: ${CHRONOS_AI_PROVIDER:mock}
+    api-key: ${CHRONOS_AI_API_KEY:}
+  security:
+    jwt-secret: ${CHRONOS_JWT_SECRET:dev-only-change-me}
+
