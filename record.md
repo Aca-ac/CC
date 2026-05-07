@@ -73,3 +73,9 @@
 - 改动文件：`.gitattributes`
 - 改动目的：固定仓库文本文件行尾规则，并将 `.docx` 等资料文件按二进制处理，避免 Windows 协作时产生无意义差异。
 - 验证结果：已添加行尾和二进制文件规则，提交前会重新暂存文件。
+
+## 2026-05-07 21:30
+
+- 改动文件：无源码改动，仅执行 Git 操作。
+- 改动目的：初始化本地 Git 仓库，提交脚手架和既有资料文件，并推送到 GitHub。
+- 验证结果：已提交 `d87e3da chore: scaffold Chronos framework`；已推送到 `https://github.com/Vincent-Ctrl-18/Chronos.git` 的 `main` 分支，并设置本地 `main` 跟踪 `origin/main`。
