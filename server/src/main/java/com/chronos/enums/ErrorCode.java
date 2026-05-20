@@ -1,4 +1,4 @@
-package com.chronos.common;
+package com.chronos.enums;
 
 /**
  * 第一版错误码只覆盖前后端联调最常用场景。

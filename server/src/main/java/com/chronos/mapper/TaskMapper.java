@@ -1,4 +1,4 @@
-package com.chronos.task;
+package com.chronos.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.chronos.entity.Task;

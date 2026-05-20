@@ -13,7 +13,7 @@ public class FocusSession {
     private String id;
     private String taskId;
     private LocalDateTime startedAt;
-    private Integer duration_minutes;
+    private Integer durationMinutes;
     private Boolean completed;
     private Integer interruptionCount;
     private LocalDateTime createdAt;

@@ -1,5 +1,7 @@
 package com.chronos.common;
 
+import com.chronos.enums.ErrorCode;
+
 /**
  * 统一 API 响应体。
  *

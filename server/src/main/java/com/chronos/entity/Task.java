@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import com.chronos.enums.Priority;
+import com.chronos.enums.TaskStatus;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -18,8 +20,8 @@ public class Task {
     private String parentTaskId;
     private String title;
     private String description;
-    private String status;
-    private String priority;
+    private TaskStatus status;
+    private Priority priority;
     private LocalDateTime dueTime;
     private Integer estimatedMinutes;
     private Integer actualMinutes;
@@ -29,6 +31,6 @@ public class Task {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    @TableLogic(value = "null", delval = "NOW()")
+    @TableLogic
     private LocalDateTime deletedAt;
 }

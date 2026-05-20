@@ -13,12 +13,13 @@ mybatis-plus:
   # 实体类所在的包路径，换成你项目中 entity 文件夹的实际包名（MP会自动建立类型别名）
   type-aliases-package: com.chronos.entity
 
+
   configuration:
     # 开启经典【驼峰命名】与数据库【下划线命名】的自动转换（如数据库 created_at -> Java createdAt）
     map-underscore-to-camel-case: true
     # 全局映射器启用缓存
     cache-enabled: false
-
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
     banner: false # 关闭 MyBatis-Plus 启动时的控制台大 Logo
     db-config:
@@ -26,7 +27,8 @@ mybatis-plus:
       id-type: assign_id
       # 逻辑删除：deleted_at 为 DATETIME 类型，MP 自动用 NOW() / NULL
       logic-delete-field: deletedAt
-
+      logic-not-delete-value: "null"
+      logic-delete-value: "now()"
 
 chronos:
   ai:

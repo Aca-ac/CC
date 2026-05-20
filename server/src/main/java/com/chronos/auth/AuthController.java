@@ -31,7 +31,7 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ApiResponse<Void> logout() {
-        // TODO(用户与权限模块): 接入 Token 黑名单或短时会话失效策略。
+        authService.logout();
         return ApiResponse.ok(null);
     }
 }
