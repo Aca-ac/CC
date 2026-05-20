@@ -9,7 +9,11 @@ public record TaskSummaryResponse(
         String status,
         String priority,
         int estimatedMinutes,
-        OffsetDateTime dueTime
+        OffsetDateTime dueTime,
+        String parentTaskId,
+        String description,
+        Integer actualMinutes,
+        String[] tags
 ) {
 }
 

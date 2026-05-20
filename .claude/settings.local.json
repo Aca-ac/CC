@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:8080/api/health)",
+      "Bash(curl -s http://localhost:8080/api/tasks)",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s \"http://localhost:8080/api/tasks?status=TODO&sortBy=dueTime&sortOrder=asc\")",
+      "Bash(curl -s -X POST http://localhost:8080/api/tasks -H \"Content-Type: application/json\" -d \"{\\\\\"projectId\\\\\":\\\\\"test-proj\\\\\",\\\\\"title\\\\\":\\\\\"测试任务\\\\\",\\\\\"priority\\\\\":\\\\\"HIGH\\\\\",\\\\\"estimatedMinutes\\\\\":60}\")",
+      "Bash(curl *)"
+    ]
+  }
+}

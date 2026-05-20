@@ -7,7 +7,7 @@ import java.time.OffsetDateTime;
 public record CreateTaskRequest(
         @NotBlank(message = "项目 ID 不能为空")
         String projectId,
-
+        String description,
         String parentTaskId,
 
         @NotBlank(message = "任务标题不能为空")
