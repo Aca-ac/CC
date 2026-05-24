@@ -1,47 +1,74 @@
 package com.chronos.project;
-
+import com.chronos.common.NotFoundException;
+import cn.dev33.satoken.stp.StpUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.chronos.entity.Project;
+import com.chronos.mapper.ProjectMapper;
 import com.chronos.project.dto.CreateProjectRequest;
 import com.chronos.project.dto.ProjectSummaryResponse;
-import java.time.LocalDate;
 import java.util.List;
+
 import org.springframework.stereotype.Service;
 
 @Service
-public class ProjectService {
+public class ProjectService extends ServiceImpl<ProjectMapper, Project>  {
 
     public List<ProjectSummaryResponse> listProjects() {
-        // TODO(后端A): 从 projects 表读取当前用户项目，并计算进度和剩余天数。
-        return List.of(sampleProject());
-    }
+        LambdaQueryWrapper<Project> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Project::getUserId, StpUtil.getLoginIdAsString());
+        queryWrapper.orderByAsc(Project::getEndDate);
 
+        return this.list(queryWrapper).stream()
+            .map(this::toResponse)
+            .toList();
+    }
+    private ProjectSummaryResponse toResponse(Project p) {
+        return new ProjectSummaryResponse(
+            p.getId(),
+            p.getName(),
+            p.getGoal(),
+            p.getStartDate(),
+            p.getEndDate(),
+            p.getStatus(),
+            p.getProgress() != null ? p.getProgress() : 0
+        );
+    }
     public ProjectSummaryResponse createProject(CreateProjectRequest request) {
-        // TODO(后端A): 校验日期合法性，写入 projects 表，并记录同步变更。
-        return new ProjectSummaryResponse(
-                "project-new",
-                request.name(),
-                request.goal(),
-                request.startDate(),
-                request.endDate(),
-                "ACTIVE",
-                0
-        );
+
+        if (request.startDate() != null && request.endDate() != null) {
+            if (request.startDate().isAfter(request.endDate())) {
+                throw new  IllegalArgumentException("项目开始时间不能晚于结束时间，请重新检查日期！");
+            }
+        }
+
+        String currentUserId = StpUtil.getLoginIdAsString();
+
+        Project project = new Project();
+        project.setName(request.name());
+        project.setGoal(request.goal());
+        project.setStartDate(request.startDate());
+        project.setEndDate(request.endDate());
+
+
+        project.setUserId(currentUserId);
+
+        this.save(project);
+        return toResponse(project);
     }
 
-    public ProjectSummaryResponse getProject(String projectId) {
-        // TODO(后端A): 找不到项目时返回 NOT_FOUND，而不是继续返回 Mock 数据。
-        return sampleProject();
+    public ProjectSummaryResponse getProject(String projectId)  {
+
+        Project project = this.getById(projectId);
+        if (project == null) {
+            throw   new NotFoundException("未找到指定ID的项目");
+        }
+        if (!project.getUserId().equals(StpUtil.getLoginIdAsString())) {
+            throw new NotFoundException("未找到指定ID的项目");
+        }
+        return this.toResponse(project);
     }
 
-    private ProjectSummaryResponse sampleProject() {
-        return new ProjectSummaryResponse(
-                "project-se",
-                "软件工程课程项目",
-                "完成 Chronos 初始框架和核心功能演示。",
-                LocalDate.of(2026, 4, 8),
-                LocalDate.of(2026, 6, 4),
-                "ACTIVE",
-                42
-        );
-    }
+
 }
 

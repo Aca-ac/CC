@@ -5,6 +5,7 @@ import com.chronos.project.dto.CreateProjectRequest;
 import com.chronos.project.dto.ProjectSummaryResponse;
 import jakarta.validation.Valid;
 import java.util.List;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,7 +35,7 @@ public class ProjectController {
     }
 
     @GetMapping("/{projectId}")
-    public ApiResponse<ProjectSummaryResponse> getProject(@PathVariable String projectId) {
+    public ApiResponse<ProjectSummaryResponse> getProject(@PathVariable String projectId)  {
         return ApiResponse.ok(projectService.getProject(projectId));
     }
 }

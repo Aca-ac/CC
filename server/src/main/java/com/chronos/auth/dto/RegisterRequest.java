@@ -12,6 +12,7 @@ public record RegisterRequest(
         @NotBlank(message = "邮箱不能为空")
         String email,
 
+        @NotBlank(message = "密码不能为空")
         @Size(min = 8, message = "密码至少 8 位")
         String password
 ) {

@@ -6,7 +6,17 @@
       "Bash(python3 -m json.tool)",
       "Bash(curl -s \"http://localhost:8080/api/tasks?status=TODO&sortBy=dueTime&sortOrder=asc\")",
       "Bash(curl -s -X POST http://localhost:8080/api/tasks -H \"Content-Type: application/json\" -d \"{\\\\\"projectId\\\\\":\\\\\"test-proj\\\\\",\\\\\"title\\\\\":\\\\\"测试任务\\\\\",\\\\\"priority\\\\\":\\\\\"HIGH\\\\\",\\\\\"estimatedMinutes\\\\\":60}\")",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(./mvnw compile *)",
+      "Bash(./mvnw clean *)",
+      "Bash(echo \"=== 测试带 token 的 GET 请求 ===\")",
+      "Bash(echo \"\")",
+      "Bash(echo \"=== 测试 dashboard/today 带 token ===\")",
+      "Bash(echo \"=== 创建项目 ===\")",
+      "Bash(echo \"=== 测试带引号日期 vs 不带引号 ===\")",
+      "Bash(tasklist)",
+      "Bash(netstat -ano)",
+      "Bash(./mvnw spring-boot:run *)"
     ]
   }
 }
