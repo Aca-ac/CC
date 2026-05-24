@@ -10,10 +10,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/dashboard")
 public class DashboardController {
 
+    private final DashboardService dashboardService;
+
+    public DashboardController(DashboardService dashboardService) {
+        this.dashboardService = dashboardService;
+    }
+
     @GetMapping("/today")
     public ApiResponse<TodayDashboardResponse> today() {
-        // TODO(前后端联调): 后续从任务、习惯、专注记录和同步队列聚合今日数据。
-        return ApiResponse.ok(new TodayDashboardResponse(6, 2, 85, 5, 1));
+        return ApiResponse.ok(dashboardService.getTodayDashboard());
     }
 }
-

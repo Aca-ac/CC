@@ -10,7 +10,7 @@ public record TaskSummaryResponse(
     String title,
     com.chronos.enums.TaskStatus status,
     Priority priority,
-    int estimatedMinutes,
+    Integer estimatedMinutes,
     OffsetDateTime dueTime,
     String parentTaskId,
     String description,

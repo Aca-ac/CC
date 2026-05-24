@@ -11,7 +11,7 @@ public enum TaskStatus implements IEnum<String> {
     DONE("DONE", "已完成"),
     PAUSED("PAUSED","暂停"),
     ARCHIVED("ARCHIVED","归档");
-        
+
     private final String code;
     private final String description;
 

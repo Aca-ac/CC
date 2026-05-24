@@ -10,6 +10,8 @@ import com.chronos.entity.User;
 import com.chronos.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 @RequiredArgsConstructor
 @Service
 public class AuthService {
@@ -19,6 +21,7 @@ public class AuthService {
     // 定义一个固定的盐值（工业规范：生产环境建议写在 application.yml 中读取）
     private static final String SALT = "Chronos_Salt_998243";
 
+    @Transactional(rollbackFor = Exception.class)
     public AuthSessionResponse register(RegisterRequest request) {
         // 1. 校验邮箱唯一性
 
@@ -60,6 +63,7 @@ public class AuthService {
         StpUtil.login(user.getId());
         return new AuthSessionResponse(String.valueOf(user.getId()), user.getName(), user.getEmail(), StpUtil.getTokenValue());
     }
+
     public void logout() {
         StpUtil.logout();
     }

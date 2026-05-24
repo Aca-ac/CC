@@ -63,6 +63,9 @@ public class ProjectService extends ServiceImpl<ProjectMapper, Project>  {
         if (project == null) {
             throw   new NotFoundException("未找到指定ID的项目");
         }
+        if (!project.getUserId().equals(StpUtil.getLoginIdAsString())) {
+            throw new NotFoundException("未找到指定ID的项目");
+        }
         return this.toResponse(project);
     }
 

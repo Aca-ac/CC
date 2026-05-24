@@ -6,6 +6,9 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.chronos.entity.Task;
 import com.chronos.enums.TaskStatus;
 import com.chronos.mapper.TaskMapper;
+import com.chronos.common.NotFoundException;
+import com.chronos.entity.Project;
+import com.chronos.mapper.ProjectMapper;
 import com.chronos.task.dto.CreateTaskRequest;
 import com.chronos.task.dto.TaskStatusRequest;
 import com.chronos.task.dto.TaskSummaryResponse;
@@ -13,8 +16,11 @@ import java.time.ZoneId;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+import cn.dev33.satoken.stp.StpUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -28,13 +34,43 @@ public class TaskService extends ServiceImpl<TaskMapper, Task> {
 
     private static final ZoneId APP_ZONE = ZoneId.of("Asia/Shanghai");
 
+    private static final Map<TaskStatus, Set<TaskStatus>> VALID_TRANSITIONS = Map.of(
+            TODO, Set.of(IN_PROGRESS, ARCHIVED),
+            IN_PROGRESS, Set.of(DONE, PAUSED, TODO),
+            PAUSED, Set.of(IN_PROGRESS, TODO, ARCHIVED),
+            DONE, Set.of(ARCHIVED),
+            ARCHIVED, Set.of()
+    );
+
+    private final ProjectMapper projectMapper;
+
+    public TaskService(ProjectMapper projectMapper) {
+        this.projectMapper = projectMapper;
+    }
+
+    private List<String> getCurrentUserProjectIds() {
+        String userId = StpUtil.getLoginIdAsString();
+        return projectMapper.selectList(
+                new LambdaQueryWrapper<Project>().eq(Project::getUserId, userId)
+        ).stream().map(Project::getId).collect(Collectors.toList());
+    }
+
     public List<TaskSummaryResponse> listTasks(String projectId, TaskStatus status,
                                                LocalDateTime dueTime, String keyword,
                                                int page, int size, String sortBy, String sortOrder) {
         LambdaQueryWrapper<Task> queryWrapper = new LambdaQueryWrapper<>();
 
-        queryWrapper.eq(StringUtils.hasText(projectId), Task::getProjectId, projectId)
-            .eq(status != null, Task::getStatus, status)
+        if (StringUtils.hasText(projectId)) {
+            queryWrapper.eq(Task::getProjectId, projectId);
+        } else {
+            List<String> userProjectIds = getCurrentUserProjectIds();
+            if (userProjectIds.isEmpty()) {
+                return List.of();
+            }
+            queryWrapper.in(Task::getProjectId, userProjectIds);
+        }
+
+        queryWrapper.eq(status != null, Task::getStatus, status)
             .le(dueTime != null, Task::getDueTime, dueTime);
 
         if (StringUtils.hasText(keyword)) {
@@ -62,6 +98,18 @@ public class TaskService extends ServiceImpl<TaskMapper, Task> {
 
     @Transactional(rollbackFor = Exception.class)
     public TaskSummaryResponse createTask(CreateTaskRequest request) {
+        if (!projectMapper.exists(new LambdaQueryWrapper<Project>()
+                .eq(Project::getId, request.projectId()))) {
+            throw new IllegalArgumentException("项目不存在");
+        }
+
+        if (request.parentTaskId() != null) {
+            if (!this.exists(new LambdaQueryWrapper<Task>()
+                    .eq(Task::getId, request.parentTaskId()))) {
+                throw new IllegalArgumentException("父任务不存在");
+            }
+        }
+
         Task task = new Task();
         task.setProjectId(request.projectId());
         task.setTitle(request.title());
@@ -96,8 +144,10 @@ public class TaskService extends ServiceImpl<TaskMapper, Task> {
         TaskStatus oldStatus = currentTask.getStatus();
         TaskStatus newStatus = request.status();
 
-        if (DONE.equals(oldStatus) && TODO.equals(newStatus)) {
-            throw new IllegalStateException("已完成的任务不能直接打回未开始状态，请遵循研发规范！");
+        Set<TaskStatus> allowed = VALID_TRANSITIONS.get(oldStatus);
+        if (allowed == null || !allowed.contains(newStatus)) {
+            throw new IllegalStateException(
+                    "不允许从 " + oldStatus.getDescription() + " 转换到 " + newStatus.getDescription());
         }
 
         currentTask.setStatus(newStatus);
