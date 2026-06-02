@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22.12.0
           cache: npm
 
       - name: Install dependencies
@@ -63,7 +63,7 @@ jobs:
         run: docker exec "${{ job.services.mysql.id }}" mysql -uroot -proot_password chronos < database/mysql/schema.sql
 
       - name: Test server and generate coverage report
-        run: ./server/mvnw -q test
+        run: ./server/mvnw -q verify
 
       - name: Upload coverage report
         if: always()
