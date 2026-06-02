@@ -1,0 +1,39 @@
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${CHRONOS_MYSQL_DATABASE:-chronos}
+      MYSQL_USER: ${CHRONOS_MYSQL_USERNAME:-chronos}
+      MYSQL_PASSWORD: ${CHRONOS_MYSQL_PASSWORD:-chronos_password}
+      MYSQL_ROOT_PASSWORD: ${CHRONOS_MYSQL_ROOT_PASSWORD:-replace-with-a-root-password}
+    volumes:
+      - chronos-mysql-data:/var/lib/mysql
+      - ./database/mysql/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot --password=\"$$MYSQL_ROOT_PASSWORD\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8080
+      CHRONOS_MYSQL_URL: jdbc:mysql://db:3306/${CHRONOS_MYSQL_DATABASE:-chronos}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      CHRONOS_MYSQL_USERNAME: ${CHRONOS_MYSQL_USERNAME:-chronos}
+      CHRONOS_MYSQL_PASSWORD: ${CHRONOS_MYSQL_PASSWORD:-chronos_password}
+      CHRONOS_JWT_SECRET: ${CHRONOS_JWT_SECRET:-replace-with-a-long-random-secret}
+      CHRONOS_AI_PROVIDER: ${CHRONOS_AI_PROVIDER:-mock}
+      CHRONOS_AI_API_KEY: ${CHRONOS_AI_API_KEY:-}
+    ports:
+      - "${CHRONOS_API_PORT:-8080}:8080"
+
+volumes:
+  chronos-mysql-data:

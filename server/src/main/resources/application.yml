@@ -9,9 +9,9 @@ spring:
       write-dates-as-timestamps: false
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/chronos?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password: password
+    url: ${CHRONOS_MYSQL_URL:jdbc:mysql://localhost:3306/chronos?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${CHRONOS_MYSQL_USERNAME:chronos}
+    password: ${CHRONOS_MYSQL_PASSWORD:chronos_password}
 mybatis-plus:
   # 实体类所在的包路径，换成你项目中 entity 文件夹的实际包名（MP会自动建立类型别名）
   type-aliases-package: com.chronos.entity
@@ -39,4 +39,3 @@ chronos:
     api-key: ${CHRONOS_AI_API_KEY:}
   security:
     jwt-secret: ${CHRONOS_JWT_SECRET:dev-only-change-me}
-
