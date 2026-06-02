@@ -1,6 +1,36 @@
-import { projects } from "../data/mockData";
+import { useEffect, useState } from "react";
+import { apiClient } from "../services/apiClient";
+import type { Project } from "../types/domain";
 
 export function ProjectsPage() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiClient
+      .listProjects()
+      .then(setProjects)
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <section className="page-stack">
+        <p>加载中...</p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="page-stack">
+        <p>加载失败：{error}</p>
+      </section>
+    );
+  }
+
   return (
     <section className="page-stack">
       <section className="panel">
@@ -31,4 +61,3 @@ export function ProjectsPage() {
     </section>
   );
 }
-

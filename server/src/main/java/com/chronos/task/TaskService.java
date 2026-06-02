@@ -6,7 +6,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.chronos.entity.Task;
 import com.chronos.enums.TaskStatus;
 import com.chronos.mapper.TaskMapper;
-import com.chronos.common.NotFoundException;
 import com.chronos.entity.Project;
 import com.chronos.mapper.ProjectMapper;
 import com.chronos.task.dto.CreateTaskRequest;
@@ -98,15 +97,24 @@ public class TaskService extends ServiceImpl<TaskMapper, Task> {
 
     @Transactional(rollbackFor = Exception.class)
     public TaskSummaryResponse createTask(CreateTaskRequest request) {
+
+        String userId = StpUtil.getLoginIdAsString();
         if (!projectMapper.exists(new LambdaQueryWrapper<Project>()
-                .eq(Project::getId, request.projectId()))) {
+                .eq(Project::getId, request.projectId())
+                .eq(Project::getUserId, userId))) {
             throw new IllegalArgumentException("项目不存在");
         }
 
         if (request.parentTaskId() != null) {
-            if (!this.exists(new LambdaQueryWrapper<Task>()
-                    .eq(Task::getId, request.parentTaskId()))) {
+            Task parentTask = this.getById(request.parentTaskId());
+            if (parentTask == null) {
                 throw new IllegalArgumentException("父任务不存在");
+            }
+            if (!parentTask.getProjectId().equals(request.projectId())) {
+                throw new IllegalArgumentException("父任务不属于当前项目");
+            }
+            if (parentTask.getParentTaskId() != null) {
+                throw new IllegalArgumentException("不支持多层嵌套子任务");
             }
         }
 
@@ -139,6 +147,10 @@ public class TaskService extends ServiceImpl<TaskMapper, Task> {
 
         Task currentTask = this.getById(taskId);
         if (currentTask == null) {
+            throw new IllegalArgumentException("未找到指定ID的任务，无法修改状态！");
+        }
+        List<String> userProjectIds = getCurrentUserProjectIds();
+        if (!userProjectIds.contains(currentTask.getProjectId())) {
             throw new IllegalArgumentException("未找到指定ID的任务，无法修改状态！");
         }
         TaskStatus oldStatus = currentTask.getStatus();
