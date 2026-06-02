@@ -17,7 +17,9 @@
       "Bash(tasklist)",
       "Bash(netstat -ano)",
       "Bash(./mvnw spring-boot:run *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(cmd.exe //c \"mvnw.cmd compile\")"
     ]
   }
 }

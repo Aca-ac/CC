@@ -34,7 +34,7 @@ public class DashboardService {
 
 
     public TodayDashboardResponse getTodayDashboard() {
-        String userId = String.valueOf(StpUtil.getLoginId());
+        String userId = StpUtil.getLoginIdAsString();
 
         LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
         LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
@@ -44,46 +44,48 @@ public class DashboardService {
                 new LambdaQueryWrapper<Project>().eq(Project::getUserId, userId)
         ).stream().map(Project::getId).collect(Collectors.toList());
 
+        // 查询当前用户所有项目的任务 ID（后续多处复用）
+        List<String> taskIds = List.of();
+        if (!projectIds.isEmpty()) {
+            taskIds = taskMapper.selectList(
+                    new LambdaQueryWrapper<Task>()
+                            .select(Task::getId)
+                            .in(Task::getProjectId, projectIds)
+            ).stream().map(Task::getId).collect(Collectors.toList());
+        }
+
         // 今日任务总数（dueTime 在今天范围内的任务）
         int todayTaskTotal = 0;
-        if (!projectIds.isEmpty()) {
+        if (!taskIds.isEmpty()) {
             todayTaskTotal = taskMapper.selectCount(
                     new LambdaQueryWrapper<Task>()
-                            .in(Task::getProjectId, projectIds)
+                            .in(Task::getId, taskIds)
                             .between(Task::getDueTime, startOfDay, endOfDay)
             ).intValue();
         }
 
         // 今日已完成任务数
         int completedTaskTotal = 0;
-        if (!projectIds.isEmpty()) {
+        if (!taskIds.isEmpty()) {
             completedTaskTotal = taskMapper.selectCount(
                     new LambdaQueryWrapper<Task>()
-                            .in(Task::getProjectId, projectIds)
+                            .in(Task::getId, taskIds)
                             .eq(Task::getStatus, TaskStatus.DONE)
                             .between(Task::getUpdatedAt, startOfDay, endOfDay)
             ).intValue();
         }
 
-        // 今日专注总时长（通过 task → project 关联过滤当前用户的数据）
+        // 今日专注总时长
         int focusMinutes = 0;
-        if (!projectIds.isEmpty()) {
-            List<Task> userTasks = taskMapper.selectList(
-                    new LambdaQueryWrapper<Task>()
-                            .select(Task::getId)
-                            .in(Task::getProjectId, projectIds)
+        if (!taskIds.isEmpty()) {
+            List<FocusSession> sessions = focusSessionMapper.selectList(
+                    new LambdaQueryWrapper<FocusSession>()
+                            .in(FocusSession::getTaskId, taskIds)
+                            .between(FocusSession::getStartedAt, startOfDay, endOfDay)
             );
-            List<String> taskIds = userTasks.stream().map(Task::getId).collect(Collectors.toList());
-            if (!taskIds.isEmpty()) {
-                List<FocusSession> sessions = focusSessionMapper.selectList(
-                        new LambdaQueryWrapper<FocusSession>()
-                                .in(FocusSession::getTaskId, taskIds)
-                                .between(FocusSession::getStartedAt, startOfDay, endOfDay)
-                );
-                focusMinutes = sessions.stream()
-                        .mapToInt(s -> s.getDurationMinutes() != null ? s.getDurationMinutes() : 0)
-                        .sum();
-            }
+            focusMinutes = sessions.stream()
+                    .mapToInt(s -> s.getDurationMinutes() != null ? s.getDurationMinutes() : 0)
+                    .sum();
         }
 
         // 最长习惯连续打卡天数
@@ -95,11 +97,21 @@ public class DashboardService {
                 .max()
                 .orElse(0);
 
-        // 待同步记录数（sync_records 表无 user_id 字段，暂无法按用户过滤；待 sync 模块完善后修复）
-        int syncPendingTotal = syncRecordMapper.selectCount(
-                new LambdaQueryWrapper<SyncRecord>()
-                        .eq(SyncRecord::getSyncStatus, "PENDING")
-        ).intValue();
+        // 待同步记录数：通过项目/任务 ID 过滤当前用户相关的同步记录
+        int syncPendingTotal = 0;
+        if (!projectIds.isEmpty()) {
+            syncPendingTotal = syncRecordMapper.selectCount(
+                    new LambdaQueryWrapper<SyncRecord>()
+                            .eq(SyncRecord::getSyncStatus, "PENDING")
+                            .and(wrapper -> wrapper
+                                    .and(w -> w.eq(SyncRecord::getEntityType, "PROJECT")
+                                            .in(SyncRecord::getEntityId, projectIds))
+                                    .or()
+                                    .and(w -> w.eq(SyncRecord::getEntityType, "TASK")
+                                            .in(SyncRecord::getEntityId, taskIds))
+                            )
+            ).intValue();
+        }
 
         return new TodayDashboardResponse(
                 todayTaskTotal,

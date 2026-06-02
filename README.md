@@ -28,9 +28,42 @@ Chronos 是面向学生和自我提升人群的智能学习任务管理系统。
 - Node.js 20 LTS 或更高版本。
 - npm 10 或更高版本。
 - JDK 17 或更高版本。
+- MySQL 8.0 或更高版本。
 - Git。
 
 本仓库使用 npm workspace 管理前端；后端使用 `server/mvnw.cmd` 或 `server/mvnw` 下载并运行 Maven，因此本机无需提前安装 Maven。
+
+## 数据库配置
+
+后端默认连接本地 MySQL。启动前需要：
+
+1. **创建数据库**（如果尚未创建）：
+
+   ```sql
+   CREATE DATABASE chronos CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+
+2. **导入表结构**：
+
+   ```powershell
+   mysql -u root -p chronos < database\mysql\schema.sql
+   ```
+
+3. **配置环境变量**，将 `.env.example` 复制为 `.env` 并填写数据库密码：
+
+   ```powershell
+   copy .env.example .env
+   ```
+
+   然后编辑 `.env` 中的以下字段：
+
+   ```env
+   DB_URL=jdbc:mysql://localhost:3306/chronos?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+   DB_USERNAME=root
+   DB_PASSWORD=你的数据库密码
+   ```
+
+   也可以在 IDE 的 Run Configuration 或系统环境变量中设置 `DB_PASSWORD`，不写入文件。
 
 ## 快速启动
 
@@ -47,7 +80,7 @@ npm run electron:dev --workspace client
 # 运行后端测试
 .\server\mvnw.cmd test
 
-# 启动后端服务
+# 启动后端服务（需先完成数据库配置）
 .\server\mvnw.cmd spring-boot:run
 ```
 

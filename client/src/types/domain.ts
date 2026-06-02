@@ -43,6 +43,7 @@ export interface Task {
   priority: TaskPriority;
   dueTime?: string;
   estimatedMinutes: number;
+  actualMinutes?: number;
   tags: string[];
 }
 

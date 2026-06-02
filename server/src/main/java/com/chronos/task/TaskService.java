@@ -82,9 +82,10 @@ public class TaskService extends ServiceImpl<TaskMapper, Task> {
         if ("dueTime".equals(sortBy)) {
             queryWrapper.orderBy(true, asc, Task::getDueTime);
         } else if ("priority".equals(sortBy)) {
-            queryWrapper.last(
-                "ORDER BY FIELD(priority, 'LOW','MEDIUM','HIGH','URGENT')" + (asc ? " ASC" : " DESC")
-            );
+            // 使用 CASE WHEN 替代 FIELD()，避免 SQL 注入风险
+            String caseExpr = "CASE priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 "
+                    + "WHEN 'MEDIUM' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END";
+            queryWrapper.last("ORDER BY " + caseExpr + (asc ? " ASC" : " DESC"));
         } else {
             queryWrapper.orderBy(true, asc, Task::getCreatedAt);
         }
