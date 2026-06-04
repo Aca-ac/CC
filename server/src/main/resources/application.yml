@@ -37,5 +37,15 @@ chronos:
   ai:
     provider: ${CHRONOS_AI_PROVIDER:mock}
     api-key: ${CHRONOS_AI_API_KEY:}
+    encryption:
+      master-key: ${CHRONOS_AI_MASTER_KEY:dev-master-key-change-me-32byte!}
+    providers:
+      deepseek:
+        endpoint: ${DEEPSEEK_ENDPOINT:https://api.deepseek.com}
+        model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+      mimo:
+        endpoint: ${MIMO_ENDPOINT:https://api.minimaxi.com}
+        model: ${MIMO_MODEL:mimo-v2.5-pro}
+    fallback-enabled: ${CHRONOS_AI_FALLBACK:false}
   security:
     jwt-secret: ${CHRONOS_JWT_SECRET:dev-only-change-me}
