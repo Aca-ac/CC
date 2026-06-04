@@ -19,7 +19,11 @@
       "Bash(./mvnw spring-boot:run *)",
       "Bash(npx tsc *)",
       "Bash(npm run *)",
-      "Bash(cmd.exe //c \"mvnw.cmd compile\")"
+      "Bash(cmd.exe //c \"mvnw.cmd compile\")",
+      "Bash(git push *)",
+      "Bash(gh run *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }
