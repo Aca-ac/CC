@@ -45,14 +45,13 @@ public class DashboardService {
         ).stream().map(Project::getId).collect(Collectors.toList());
 
         // 查询当前用户所有项目的任务 ID（后续多处复用）
-        List<String> taskIds = List.of();
-        if (!projectIds.isEmpty()) {
-            taskIds = taskMapper.selectList(
-                    new LambdaQueryWrapper<Task>()
-                            .select(Task::getId)
-                            .in(Task::getProjectId, projectIds)
-            ).stream().map(Task::getId).collect(Collectors.toList());
-        }
+        final List<String> taskIds = projectIds.isEmpty()
+                ? List.of()
+                : taskMapper.selectList(
+                        new LambdaQueryWrapper<Task>()
+                                .select(Task::getId)
+                                .in(Task::getProjectId, projectIds)
+                ).stream().map(Task::getId).collect(Collectors.toList());
 
         // 今日任务总数（dueTime 在今天范围内的任务）
         int todayTaskTotal = 0;
