@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
-import { Clock3 } from "lucide-react";
+import { Clock3, LogOut } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 export interface NavigationItem {
   path: string;
@@ -16,6 +17,7 @@ interface AppLayoutProps {
 export function AppLayout({ navigation, children }: AppLayoutProps) {
   const location = useLocation();
   const current = navigation.find((item) => item.path === location.pathname);
+  const { session, logout } = useAuth();
 
   return (
     <div className="app-shell">
@@ -41,6 +43,22 @@ export function AppLayout({ navigation, children }: AppLayoutProps) {
             );
           })}
         </nav>
+
+        <div className="sidebar-footer">
+          <div className="sidebar-user">
+            <span className="sidebar-user-name">{session?.name ?? "用户"}</span>
+            <span className="sidebar-user-email">{session?.email ?? ""}</span>
+          </div>
+          <button
+            className="btn-logout"
+            onClick={logout}
+            title="退出登录"
+            type="button"
+          >
+            <LogOut size={16} />
+            <span>退出</span>
+          </button>
+        </div>
       </aside>
 
       <main className="main-panel">

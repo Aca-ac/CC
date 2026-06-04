@@ -16,6 +16,13 @@ export interface User {
   role: "STUDENT" | "ADMIN";
 }
 
+export interface AuthSession {
+  userId: string;
+  name: string;
+  email: string;
+  token: string;
+}
+
 export interface Project {
   id: EntityId;
   name: string;
@@ -36,6 +43,7 @@ export interface Task {
   priority: TaskPriority;
   dueTime?: string;
   estimatedMinutes: number;
+  actualMinutes?: number;
   tags: string[];
 }
 
@@ -90,5 +98,12 @@ export interface DashboardSummary {
   focusMinutes: number;
   habitStreak: number;
   syncPendingTotal: number;
+}
+
+export interface AiBreakdownPreviewResponse {
+  draftId: string;
+  goal: string;
+  stages: string[];
+  firstAction: string;
 }
 

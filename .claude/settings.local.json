@@ -16,7 +16,14 @@
       "Bash(echo \"=== 测试带引号日期 vs 不带引号 ===\")",
       "Bash(tasklist)",
       "Bash(netstat -ano)",
-      "Bash(./mvnw spring-boot:run *)"
+      "Bash(./mvnw spring-boot:run *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(cmd.exe //c \"mvnw.cmd compile\")",
+      "Bash(git push *)",
+      "Bash(gh run *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }
