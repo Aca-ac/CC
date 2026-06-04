@@ -2,7 +2,7 @@ name: Chronos CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/**]
   pull_request:
     branches: [main]
 
@@ -23,12 +23,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Type check
+        run: npx tsc -p client/tsconfig.app.json --noEmit
+
       - name: Build client
         run: npm run build --workspace client
 
   backend:
     name: Backend Test
     runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: chronos
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,7 +56,15 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          cache: maven
+
+      - name: Import schema
+        run: mysql -h 127.0.0.1 -u root -proot chronos < database/mysql/schema.sql
 
       - name: Test server
         run: ./server/mvnw -q test
+        env:
+          DB_URL: jdbc:mysql://localhost:3306/chronos?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+          DB_USERNAME: root
+          DB_PASSWORD: root
 
