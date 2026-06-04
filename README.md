@@ -16,9 +16,10 @@ Chronos 是面向学生和自我提升人群的智能学习任务管理系统。
 ├── server/                  # Spring Boot 后端框架
 ├── database/
 │   ├── mysql/schema.sql     # 云端 MySQL 建表草案
-│   └── sqlite/schema.sql    # 本地 SQLite 建表草案
+│   └── sqlite/schema.sql    # 历史本地 SQLite 设计草案
 ├── docs/                    # 架构、接口、数据库和开发指南
 ├── .github/workflows/ci.yml # 持续集成检查入口
+├── compose.yml              # Linux 云服务器 Docker Compose 入口
 ├── .env.example             # 环境变量模板
 └── record.md                # 每次改动记录
 ```
@@ -88,8 +89,13 @@ npm run electron:dev --workspace client
 
 1. 前端先补齐页面交互：今日看板、项目、任务、日历、AI 拆解、统计、设置。
 2. 后端先实现认证、项目、任务和健康检查接口，再逐步接入统计、同步和 AI 草稿接口。
-3. 数据库先使用 SQLite/MySQL 脚本统一核心字段，后续根据实体和接口演进补迁移工具。
+3. 桌面端按本轮交付计划使用 IndexedDB + outbox；云端使用 MySQL，并根据实体和接口演进补 Flyway 迁移。
 4. 每次变更都更新 `record.md`，记录文件范围、目的和验证结果。
 
-更多说明见 `docs/architecture.md`、`docs/api.md`、`docs/database.md` 和 `docs/development-guide.md`。
+## 部署与制品
 
+- Linux 云服务器克隆仓库后，通过 `docker compose up -d --build` 启动 API 与 MySQL。
+- 每个 PR 必须通过前端构建、后端测试和 MySQL 冒烟检查。
+- Windows `.exe` 安装包通过 GitHub Actions 中的 `Windows Installer` workflow 手动生成。
+
+更多说明见 `docs/architecture.md`、`docs/api.md`、`docs/database.md`、`docs/development-guide.md` 和 `docs/deployment.md`。
