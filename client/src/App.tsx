@@ -7,11 +7,8 @@ import {
   ListChecks,
   Settings,
 } from "lucide-react";
-import { Navigate, Route, HashRouter, Routes } from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout, type NavigationItem } from "./components/AppLayout";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { LoginPage } from "./pages/LoginPage";
-import { RegisterPage } from "./pages/RegisterPage";
 import { AiBreakdownPage } from "./pages/AiBreakdownPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -33,42 +30,19 @@ const navigation: NavigationItem[] = [
 export function App() {
   return (
     <HashRouter>
-      <AuthProvider>
+      <AppLayout navigation={navigation}>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          {/* 所有需要登录的页面走 AppLayout */}
-          <Route
-            path="/*"
-            element={
-              <RequireAuth>
-                <AppLayout navigation={navigation}>
-                  <Routes>
-                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                    <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/projects" element={<ProjectsPage />} />
-                    <Route path="/tasks" element={<TasksPage />} />
-                    <Route path="/calendar" element={<CalendarPage />} />
-                    <Route path="/ai" element={<AiBreakdownPage />} />
-                    <Route path="/stats" element={<StatsPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                  </Routes>
-                </AppLayout>
-              </RequireAuth>
-            }
-          />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/tasks" element={<TasksPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/ai" element={<AiBreakdownPage />} />
+          <Route path="/stats" element={<StatsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
-      </AuthProvider>
+      </AppLayout>
     </HashRouter>
   );
-}
-
-/** 路由守卫：未登录时重定向到 /login */
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-  return <>{children}</>;
 }
 
