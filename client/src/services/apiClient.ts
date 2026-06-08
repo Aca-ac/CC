@@ -7,6 +7,46 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+/** 同步推送请求中的单条变更记录 */
+export interface SyncRecordItem {
+  entityType: "PROJECT" | "TASK" | "LOG";
+  entityId: string;
+  changeType: "CREATE" | "UPDATE" | "DELETE";
+  version: number;
+  payload: unknown;
+}
+
+/** 同步推送响应 */
+export interface SyncPushResult {
+  accepted: number;
+  conflictTotal: number;
+  conflicts: ConflictDto[];
+}
+
+/** 冲突记录 DTO（服务端返回） */
+export interface ConflictDto {
+  id: string;
+  entityType: "PROJECT" | "TASK" | "LOG";
+  entityId: string;
+  serverVersion: number;
+  clientVersion: number;
+  serverPayload: unknown;
+  clientPayload: unknown;
+  serverUpdatedAt: string;
+  clientUpdatedAt: string;
+}
+
+/** 同步拉取响应 */
+export interface SyncPullResult {
+  cursor: string;
+  changes: SyncRecordItem[];
+}
+
+/** 冲突解决请求 */
+export interface ResolveConflictRequest {
+  resolution: "keep-local" | "keep-cloud";
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -41,6 +81,28 @@ export const apiClient = {
     request<unknown>("/ai/breakdown-preview", {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+
+  // ── Sync & Conflict ──────────────────────────────────────────
+
+  /** 推送本地变更到服务端，返回被接受的条目数和冲突列表 */
+  syncPush: (records: SyncRecordItem[]) =>
+    request<SyncPushResult>("/sync/push", {
+      method: "POST",
+      body: JSON.stringify({ records }),
+    }),
+
+  /** 从服务端拉取远端变更 */
+  syncPull: (cursor?: string) => {
+    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+    return request<SyncPullResult>(`/sync/pull${query}`);
+  },
+
+  /** 提交冲突解决结果：keep-local 或 keep-cloud */
+  resolveConflict: (conflictId: string, body: ResolveConflictRequest) =>
+    request<void>(`/sync/conflicts/${conflictId}/resolve`, {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
 };
 
