@@ -24,6 +24,7 @@ const ENTITY_TYPE_LABEL: Record<ConflictValue["entityType"], string> = {
   PROJECT: "项目",
   TASK: "任务",
   LOG: "学习日志",
+  FOCUS: "专注计时",
 };
 
 function formatTimestamp(ts: number): string {

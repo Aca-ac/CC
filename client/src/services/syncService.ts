@@ -44,13 +44,17 @@ export async function pushPendingMutations(
     await outboxRepository.updateStatus(entry.mutationId, "syncing");
   }
 
-  const records: SyncRecordItem[] = pending.map((e) => ({
-    entityType: e.entityType,
-    entityId: e.entityId,
-    changeType: e.operation,
-    version: 0, // 由服务端比对
-    payload: JSON.parse(e.payload),
-  }));
+  const records: SyncRecordItem[] = pending
+    .filter((e): e is typeof e & { entityType: "PROJECT" | "TASK" | "LOG" } =>
+      e.entityType === "PROJECT" || e.entityType === "TASK" || e.entityType === "LOG"
+    )
+    .map((e) => ({
+      entityType: e.entityType,
+      entityId: e.entityId,
+      changeType: e.operation,
+      version: 0, // 由服务端比对
+      payload: JSON.parse(e.payload),
+    }));
 
   const conflicts: ConflictValue[] = [];
   const errors: string[] = [];
