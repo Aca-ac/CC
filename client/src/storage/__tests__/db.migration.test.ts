@@ -11,15 +11,17 @@ describe("IndexedDB Migration", () => {
     await closeDB();
   });
 
-  it("should create database with version 1 schema", async () => {
+  it("should create database with version 2 schema", async () => {
     const db = await getDB();
-    expect(db.version).toBe(1);
+    expect(db.version).toBe(2);
     expect(db.objectStoreNames).toContain("projects");
     expect(db.objectStoreNames).toContain("tasks");
     expect(db.objectStoreNames).toContain("learningLogs");
     expect(db.objectStoreNames).toContain("syncCursors");
     expect(db.objectStoreNames).toContain("conflicts");
     expect(db.objectStoreNames).toContain("outbox");
+    expect(db.objectStoreNames).toContain("focusSessions");
+    expect(db.objectStoreNames).toContain("timerState");
   });
 
   it("should persist data across multiple connections", async () => {

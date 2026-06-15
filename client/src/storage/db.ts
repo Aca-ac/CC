@@ -1,7 +1,7 @@
 import { openDB, type IDBPDatabase } from "idb";
 
 const DB_NAME = "chronos";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export interface ProjectValue {
   id: string;
@@ -49,6 +49,29 @@ export interface LearningLogValue {
   deleted: boolean;
 }
 
+export interface FocusSessionValue {
+  id: string;
+  accountId: string;
+  projectId: string;
+  taskId?: string;
+  startTime: number;
+  endTime?: number;
+  durationMinutes: number;
+  discarded: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface TimerStateValue {
+  accountId: string;
+  active: boolean;
+  sessionId?: string;
+  projectId?: string;
+  taskId?: string;
+  startTime?: number;
+  updatedAt: number;
+}
+
 export interface SyncCursorValue {
   accountId: string;
   cursor: string;
@@ -58,7 +81,7 @@ export interface SyncCursorValue {
 export interface ConflictValue {
   id: string;
   accountId: string;
-  entityType: "PROJECT" | "TASK" | "LOG";
+  entityType: "PROJECT" | "TASK" | "LOG" | "FOCUS";
   entityId: string;
   localData: string;
   remoteData: string;
@@ -73,7 +96,7 @@ export interface OutboxValue {
   mutationId: string;
   accountId: string;
   operation: "CREATE" | "UPDATE" | "DELETE";
-  entityType: "PROJECT" | "TASK" | "LOG";
+  entityType: "PROJECT" | "TASK" | "LOG" | "FOCUS";
   entityId: string;
   payload: string;
   status: OutboxStatus;
@@ -114,6 +137,15 @@ export function getDB(): Promise<IDBPDatabase> {
         outboxStore.createIndex("by-account", "accountId");
         outboxStore.createIndex("by-status", "status");
         outboxStore.createIndex("by-created", "createdAt");
+      }
+
+      if (oldVersion < 2) {
+        const focusStore = db.createObjectStore("focusSessions", { keyPath: "id" });
+        focusStore.createIndex("by-account", "accountId");
+        focusStore.createIndex("by-project", "projectId");
+        focusStore.createIndex("by-discarded", "discarded");
+
+        db.createObjectStore("timerState", { keyPath: "accountId" });
       }
     },
   });
