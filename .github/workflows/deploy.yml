@@ -82,8 +82,8 @@ jobs:
           vite_api_base="$(env_value VITE_API_BASE_URL)"
           api_port="$(env_value CHRONOS_API_PORT)"
 
-          vite_app_base="${vite_app_base:-/chrons/}"
-          vite_api_base="${vite_api_base:-/chrons/api}"
+          vite_app_base="${vite_app_base:-/chronos/}"
+          vite_api_base="${vite_api_base:-/chronos/api}"
           api_port="${api_port:-8782}"
 
           npm ci
