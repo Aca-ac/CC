@@ -84,11 +84,22 @@ export function DashboardPage() {
 
             <section className="panel">
               <div className="panel-heading">
-                <h2>习惯与 AI 提示</h2>
-                <p>AI 建议只作为草稿展示，用户确认前不修改正式数据。</p>
+                <h2>同步与建议</h2>
+                <p>本地数据可离线使用，AI 输出会先进入草稿预览。</p>
               </div>
-              <div className="state-message state-empty">
-                习惯与 AI 提示模块待接入真实数据。
+              <div className="compact-list">
+                <div className="compact-item">
+                  <span>待同步变更</span>
+                  <strong>{summary.syncPendingTotal}</strong>
+                </div>
+                <div className="compact-item">
+                  <span>连续打卡</span>
+                  <strong>{summary.habitStreak} 天</strong>
+                </div>
+                <div className="compact-item">
+                  <span>AI 工作流</span>
+                  <strong>草稿确认</strong>
+                </div>
               </div>
             </section>
           </div>

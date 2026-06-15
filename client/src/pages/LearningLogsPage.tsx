@@ -200,7 +200,7 @@ export function LearningLogsPage() {
                 {logs.map((log) => (
                   <tr key={log.id}>
                     <td>
-                      <span className={`badge ${log.type === "timer" ? "status-in-progress" : "status-done"}`}>
+                      <span className={`badge ${log.type === "timer" ? "status-in_progress" : "status-done"}`}>
                         {log.type === "timer" ? "计时" : "手动"}
                       </span>
                     </td>
