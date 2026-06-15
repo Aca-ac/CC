@@ -498,6 +498,57 @@ th {
   }
 }
 
+/* ── Draft / Advice ─────────────────────────────────────────── */
+
+.draft-phase {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--line);
+}
+
+.draft-task {
+  margin-top: var(--space-sm);
+}
+
+.draft-task-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+}
+
+.draft-first-action {
+  margin-top: var(--space-xl);
+  padding: var(--space-lg);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+
+.advice-list {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.advice-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-lg);
+  background: var(--panel);
+}
+
+.advice-card p {
+  margin: var(--space-sm) 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.advice-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 /* ── Conflict Dialog ─────────────────────────────────────────── */
 
 .conflict-overlay {
