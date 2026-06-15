@@ -72,6 +72,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const apiClient = {
   health: () => request<{ status: string; service: string }>("/health"),
+  get: <T>(path: string) => request<T>(path),
   getTodayDashboard: () =>
     request<DashboardSummary>("/dashboard/today"),
   listProjects: () => request<Project[]>("/projects"),
