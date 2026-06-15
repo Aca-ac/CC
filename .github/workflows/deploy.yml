@@ -1,0 +1,109 @@
+name: Chronos CD
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+concurrency:
+  group: chronos-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy-after-pr-merge
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy over SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          REPO_FULL_NAME: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_PORT"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_PATH"
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$REPO_FULL_NAME"
+
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/chronos_deploy_key
+          chmod 600 ~/.ssh/chronos_deploy_key
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+          ssh \
+            -i ~/.ssh/chronos_deploy_key \
+            -p "$DEPLOY_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o PreferredAuthentications=publickey \
+            -o PasswordAuthentication=no \
+            -o KbdInteractiveAuthentication=no \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' REPO_FULL_NAME='$REPO_FULL_NAME' bash -se" <<'REMOTE'
+          set -euo pipefail
+
+          repo_url="git@github.com:${REPO_FULL_NAME}.git"
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+          if [ ! -d "$DEPLOY_PATH/.git" ]; then
+            mkdir -p "$(dirname "$DEPLOY_PATH")"
+            git clone "$repo_url" "$DEPLOY_PATH"
+          fi
+
+          cd "$DEPLOY_PATH"
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+
+          if [ ! -f .env ]; then
+            cp .env.example .env
+            echo "::error::.env was created from .env.example. Fill production secrets on the server, then rerun the deployment."
+            exit 1
+          fi
+
+          env_value() {
+            local key="$1"
+            grep -E "^${key}=" .env | tail -n 1 | cut -d= -f2- || true
+          }
+
+          vite_app_base="$(env_value VITE_APP_BASE)"
+          vite_api_base="$(env_value VITE_API_BASE_URL)"
+          api_port="$(env_value CHRONOS_API_PORT)"
+
+          vite_app_base="${vite_app_base:-/chrons/}"
+          vite_api_base="${vite_api_base:-/chrons/api}"
+          api_port="${api_port:-8782}"
+
+          npm ci
+          VITE_APP_BASE="$vite_app_base" VITE_API_BASE_URL="$vite_api_base" npm run build --workspace client
+
+          docker compose --env-file .env -p chronos up -d --build
+
+          sudo nginx -t
+          sudo systemctl reload nginx
+
+          for attempt in {1..30}; do
+            if curl -fsS "http://127.0.0.1:${api_port}/api/health"; then
+              test -f client/dist/index.html
+              exit 0
+            fi
+            echo "Chronos API not ready yet (attempt ${attempt}/30)."
+            sleep 2
+          done
+
+          docker compose --env-file .env -p chronos ps
+          docker compose --env-file .env -p chronos logs --tail=120 api
+          exit 1
+          REMOTE

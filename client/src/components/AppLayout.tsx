@@ -16,6 +16,11 @@ interface AppLayoutProps {
 export function AppLayout({ navigation, children }: AppLayoutProps) {
   const location = useLocation();
   const current = navigation.find((item) => item.path === location.pathname);
+  const today = new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  }).format(new Date());
 
   return (
     <div className="app-shell">
@@ -46,14 +51,19 @@ export function AppLayout({ navigation, children }: AppLayoutProps) {
       <main className="main-panel">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Chronos Scaffold</p>
+            <p className="eyebrow">Chronos Workspace</p>
             <h1>{current?.label ?? "今日看板"}</h1>
+            <p className="topbar-subtitle">
+              {today} · 本地优先记录，联网后同步云端。
+            </p>
           </div>
-          <span className="sync-pill">本地优先 · AI 可选</span>
+          <div className="topbar-actions" aria-label="运行状态">
+            <span className="sync-pill">本地优先</span>
+            <span className="sync-pill sync-pill-accent">AI 草稿确认后生效</span>
+          </div>
         </header>
         {children}
       </main>
     </div>
   );
 }
-
