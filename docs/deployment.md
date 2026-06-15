@@ -1,6 +1,6 @@
 # Chronos 部署与 GitHub Actions CD
 
-目标地址：`https://vincentt.xyz/chrons/`
+目标地址：`https://vincentt.xyz/chronos/`
 
 本项目按子路径部署，避免影响服务器上已有的 ByteDance 根站和 `/party/` 项目：
 
@@ -9,8 +9,8 @@
 - 后端容器内部端口：`8080`
 - 后端宿主机端口：`8782`
 - 前端静态目录：`/var/www/chronos/client/dist`
-- Nginx 子路径：`/chrons/`
-- API 子路径：`/chrons/api/` 转发到 `http://127.0.0.1:8782/api/`
+- Nginx 子路径：`/chronos/`
+- API 子路径：`/chronos/api/` 转发到 `http://127.0.0.1:8782/api/`
 
 ## 1. 服务器准备
 
@@ -85,8 +85,8 @@ sudo -u deploy cp .env.example .env
 编辑 `/var/www/chronos/.env`，至少使用下面这些生产值：
 
 ```bash
-VITE_APP_BASE=/chrons/
-VITE_API_BASE_URL=/chrons/api
+VITE_APP_BASE=/chronos/
+VITE_API_BASE_URL=/chronos/api
 
 SERVER_PORT=8080
 CHRONOS_API_PORT=8782
@@ -167,7 +167,7 @@ if: github.event.pull_request.merged == true
 ```bash
 cd /var/www/chronos
 npm ci
-VITE_APP_BASE=/chrons/ VITE_API_BASE_URL=/chrons/api npm run build --workspace client
+VITE_APP_BASE=/chronos/ VITE_API_BASE_URL=/chronos/api npm run build --workspace client
 docker compose --env-file .env -p chronos up -d --build
 curl -fsS http://127.0.0.1:8782/api/health
 sudo nginx -t
@@ -177,6 +177,6 @@ sudo systemctl reload nginx
 浏览器检查：
 
 ```bash
-curl -I https://vincentt.xyz/chrons/
-curl -fsS https://vincentt.xyz/chrons/api/health
+curl -I https://vincentt.xyz/chronos/
+curl -fsS https://vincentt.xyz/chronos/api/health
 ```
