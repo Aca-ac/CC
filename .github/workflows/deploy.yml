@@ -47,6 +47,9 @@ jobs:
             -o PreferredAuthentications=publickey \
             -o PasswordAuthentication=no \
             -o KbdInteractiveAuthentication=no \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=20 \
+            -o TCPKeepAlive=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" \
             "DEPLOY_PATH='$DEPLOY_PATH' REPO_FULL_NAME='$REPO_FULL_NAME' bash -se" <<'REMOTE'
           set -euo pipefail
