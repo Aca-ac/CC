@@ -1,4 +1,5 @@
 import { useStats } from "../hooks/useStats";
+import type { LearningAdvice } from "../services/aiService";
 
 function formatDateLabel(dateStr: string): string {
   const d = new Date(dateStr);
@@ -98,8 +99,36 @@ function PieChart({
   );
 }
 
+function AdviceCard({ advice }: { advice: LearningAdvice }) {
+  const typeLabel: Record<string, string> = {
+    BREAKDOWN: "拆解",
+    REVIEW: "复盘",
+    RISK: "风险",
+    TIP: "建议",
+  };
+
+  const typeClass: Record<string, string> = {
+    BREAKDOWN: "status-in_progress",
+    REVIEW: "status-done",
+    RISK: "priority-urgent",
+    TIP: "status-paused",
+  };
+
+  return (
+    <div className="advice-card">
+      <div className="advice-header">
+        <span className={`badge ${typeClass[advice.type] ?? "status-paused"}`}>
+          {typeLabel[advice.type] ?? advice.type}
+        </span>
+        <strong>{advice.title}</strong>
+      </div>
+      <p>{advice.content}</p>
+    </div>
+  );
+}
+
 export function StatsPage() {
-  const { stats, loading, error, cached, refresh } = useStats();
+  const { stats, advice, loading, error, cached, refresh } = useStats();
 
   const hasData = stats && stats.totalCompleted > 0;
 
@@ -162,6 +191,20 @@ export function StatsPage() {
               </strong>
             </article>
           </div>
+
+          {/* AI 学习建议 */}
+          {advice.length > 0 && (
+            <section className="panel">
+              <div className="panel-heading">
+                <h2>AI 学习建议</h2>
+              </div>
+              <div className="advice-list">
+                {advice.map((a, i) => (
+                  <AdviceCard key={i} advice={a} />
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* 图表区域 */}
           <div className="content-grid">
