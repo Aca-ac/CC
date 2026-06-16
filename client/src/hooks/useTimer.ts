@@ -2,9 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { focusSessionRepository } from "../storage/repositories/focusSessionRepository";
 import { timerStateRepository } from "../storage/repositories/timerStateRepository";
 import { outboxRepository } from "../storage/repositories/outboxRepository";
+import { useAccountId } from "./useAccountId";
 import type { FocusSessionValue } from "../storage/db";
-
-const ACCOUNT_ID = "local"; // TODO: 从 auth context 获取真实 accountId
 
 export interface TimerState {
   active: boolean;
@@ -23,6 +22,7 @@ export interface UseTimerReturn {
 }
 
 export function useTimer(): UseTimerReturn {
+  const accountId = useAccountId();
   const [timer, setTimer] = useState<TimerState>({
     active: false,
     elapsedSeconds: 0,
@@ -52,7 +52,7 @@ export function useTimer(): UseTimerReturn {
     async (operation: "CREATE" | "UPDATE" | "DELETE", entityId: string, payload: unknown) => {
       await outboxRepository.create({
         mutationId: crypto.randomUUID(),
-        accountId: ACCOUNT_ID,
+        accountId,
         operation,
         entityType: "FOCUS",
         entityId,
@@ -63,13 +63,13 @@ export function useTimer(): UseTimerReturn {
         updatedAt: Date.now(),
       });
     },
-    []
+    [accountId]
   );
 
   const startTimer = useCallback(
     async (projectId: string, taskId?: string) => {
       // 每个账户只能有一个活跃计时器
-      const existing = await focusSessionRepository.findActive(ACCOUNT_ID);
+      const existing = await focusSessionRepository.findActive(accountId);
       if (existing) {
         throw new Error("已有一个活跃计时器，请先停止或丢弃当前计时器");
       }
@@ -77,7 +77,7 @@ export function useTimer(): UseTimerReturn {
       const now = Date.now();
       const session: FocusSessionValue = {
         id: crypto.randomUUID(),
-        accountId: ACCOUNT_ID,
+        accountId,
         projectId,
         taskId,
         startTime: now,
@@ -89,7 +89,7 @@ export function useTimer(): UseTimerReturn {
 
       await focusSessionRepository.create(session);
       await timerStateRepository.set({
-        accountId: ACCOUNT_ID,
+        accountId,
         active: true,
         sessionId: session.id,
         projectId,
@@ -109,7 +109,7 @@ export function useTimer(): UseTimerReturn {
       });
       startTick();
     },
-    [enqueue, startTick]
+    [accountId, enqueue, startTick]
   );
 
   const stopTimer = useCallback(async () => {
@@ -122,7 +122,7 @@ export function useTimer(): UseTimerReturn {
       endTime: now,
       durationMinutes: elapsedMinutes,
     });
-    await timerStateRepository.clear(ACCOUNT_ID);
+    await timerStateRepository.clear(accountId);
     await enqueue("UPDATE", timer.sessionId, {
       endTime: now,
       durationMinutes: elapsedMinutes,
@@ -130,7 +130,7 @@ export function useTimer(): UseTimerReturn {
 
     clearTick();
     setTimer({ active: false, elapsedSeconds: 0 });
-  }, [timer.active, timer.sessionId, timer.elapsedSeconds, enqueue, clearTick]);
+  }, [accountId, timer.active, timer.sessionId, timer.elapsedSeconds, enqueue, clearTick]);
 
   const discardTimer = useCallback(async () => {
     if (!timer.active || !timer.sessionId) return;
@@ -139,20 +139,20 @@ export function useTimer(): UseTimerReturn {
       discarded: true,
       endTime: Date.now(),
     });
-    await timerStateRepository.clear(ACCOUNT_ID);
+    await timerStateRepository.clear(accountId);
     await enqueue("UPDATE", timer.sessionId, { discarded: true });
 
     clearTick();
     setTimer({ active: false, elapsedSeconds: 0 });
-  }, [timer.active, timer.sessionId, enqueue, clearTick]);
+  }, [accountId, timer.active, timer.sessionId, enqueue, clearTick]);
 
   const restoreTimer = useCallback(async () => {
-    const state = await timerStateRepository.get(ACCOUNT_ID);
+    const state = await timerStateRepository.get(accountId);
     if (!state || !state.active || !state.sessionId || !state.startTime) return;
 
     const session = await focusSessionRepository.findById(state.sessionId);
     if (!session || session.endTime || session.discarded) {
-      await timerStateRepository.clear(ACCOUNT_ID);
+      await timerStateRepository.clear(accountId);
       return;
     }
 
@@ -166,13 +166,13 @@ export function useTimer(): UseTimerReturn {
       sessionId: state.sessionId,
     });
     startTick();
-  }, [startTick]);
+  }, [accountId, startTick]);
 
   // 应用重新打开时恢复活跃计时器
   useEffect(() => {
     restoreTimer();
     return () => clearTick();
-  }, []);
+  }, [clearTick, restoreTimer]);
 
   return {
     timer,
