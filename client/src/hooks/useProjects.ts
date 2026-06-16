@@ -24,7 +24,7 @@ export interface UseProjectsReturn {
   loading: boolean;
   error: string | null;
   online: boolean;
-  createProject: (data: Omit<ProjectValue, "id" | "accountId" | "createdAt" | "updatedAt" | "deleted">) => Promise<void>;
+  createProject: (data: Omit<ProjectValue, "id" | "accountId" | "createdAt" | "updatedAt" | "deleted">) => Promise<Project>;
   updateProject: (id: string, changes: Partial<ProjectValue>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -103,7 +103,9 @@ export function useProjects(): UseProjectsReturn {
       };
       await projectRepository.create(project);
       await enqueue("CREATE", project.id, project);
-      setProjects((prev) => [...prev, toDomain(project)]);
+      const domain = toDomain(project);
+      setProjects((prev) => [...prev, domain]);
+      return domain;
     },
     [enqueue]
   );

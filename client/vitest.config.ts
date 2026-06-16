@@ -9,6 +9,5 @@ export default defineConfig({
     setupFiles: ["./src/storage/__tests__/setup.ts"],
     pool: "threads",
     testTimeout: 60000,
-    hookTimeout: 60000,
   },
 });

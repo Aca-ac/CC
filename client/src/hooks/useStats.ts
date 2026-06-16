@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { statsService, type WeeklyStatsDTO } from "../services/statsService";
-import { aiService, type LearningAdvice } from "../services/aiService";
 
 const CACHE_KEY = "chronos_stats_cache";
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
@@ -35,7 +34,6 @@ function setCachedStats(data: WeeklyStatsDTO) {
 
 export interface UseStatsReturn {
   stats: WeeklyStatsDTO | null;
-  advice: LearningAdvice[];
   loading: boolean;
   error: string | null;
   cached: boolean;
@@ -44,7 +42,6 @@ export interface UseStatsReturn {
 
 export function useStats(): UseStatsReturn {
   const [stats, setStats] = useState<WeeklyStatsDTO | null>(getCachedStats);
-  const [advice, setAdvice] = useState<LearningAdvice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cached, setCached] = useState(() => getCachedStats() !== null);
@@ -53,12 +50,8 @@ export function useStats(): UseStatsReturn {
     setLoading(true);
     setError(null);
     try {
-      const [data, adv] = await Promise.all([
-        statsService.getWeeklyStats(),
-        aiService.getAdvice().catch(() => [] as LearningAdvice[]),
-      ]);
+      const data = await statsService.getWeeklyStats();
       setStats(data);
-      setAdvice(adv);
       setCached(false);
       setCachedStats(data);
     } catch (err) {
@@ -81,7 +74,6 @@ export function useStats(): UseStatsReturn {
 
   return {
     stats,
-    advice,
     loading,
     error,
     cached,
