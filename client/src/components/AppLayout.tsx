@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
-import { Clock3 } from "lucide-react";
+import { Clock3, LogOut, User } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 
 export interface NavigationItem {
   path: string;
@@ -15,12 +16,8 @@ interface AppLayoutProps {
 
 export function AppLayout({ navigation, children }: AppLayoutProps) {
   const location = useLocation();
+  const { session, offline, logout } = useAuth();
   const current = navigation.find((item) => item.path === location.pathname);
-  const today = new Intl.DateTimeFormat("zh-CN", {
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  }).format(new Date());
 
   return (
     <div className="app-shell">
@@ -46,21 +43,30 @@ export function AppLayout({ navigation, children }: AppLayoutProps) {
             );
           })}
         </nav>
+
+        {session && (
+          <div className="user-bar">
+            <div className="user-info">
+              <User size={16} />
+              <span>{session.name}</span>
+            </div>
+            {offline && <span className="offline-badge">离线</span>}
+            <button className="logout-btn" onClick={logout} title="登出" aria-label="登出">
+              <LogOut size={16} />
+            </button>
+          </div>
+        )}
       </aside>
 
       <main className="main-panel">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Chronos Workspace</p>
+            <p className="eyebrow">Chronos Scaffold</p>
             <h1>{current?.label ?? "今日看板"}</h1>
-            <p className="topbar-subtitle">
-              {today} · 本地优先记录，联网后同步云端。
-            </p>
           </div>
-          <div className="topbar-actions" aria-label="运行状态">
-            <span className="sync-pill">本地优先</span>
-            <span className="sync-pill sync-pill-accent">AI 草稿确认后生效</span>
-          </div>
+          <span className="sync-pill">
+            {offline ? "离线模式" : "本地优先 · AI 可选"}
+          </span>
         </header>
         {children}
       </main>
