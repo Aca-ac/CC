@@ -81,7 +81,7 @@ export interface SyncCursorValue {
 export interface ConflictValue {
   id: string;
   accountId: string;
-  entityType: "PROJECT" | "TASK" | "LOG" | "FOCUS";
+  entityType: string;
   entityId: string;
   localData: string;
   remoteData: string;
