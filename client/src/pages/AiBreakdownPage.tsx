@@ -1,145 +1,55 @@
 import { useState } from "react";
-import {
-  aiService,
-  type BreakdownPreview,
-  type BreakdownTask,
-} from "../services/aiService";
-
-type DraftStatus = "idle" | "loading" | "preview" | "editing" | "committing" | "done" | "error";
+import { aiService, type BreakdownPreview, type BreakdownPhase, type BreakdownTask } from "../services/aiService";
+import { useProjects } from "../hooks/useProjects";
+import { useTasks } from "../hooks/useTasks";
 
 function TaskItem({
   task,
-  depth = 0,
   onChange,
 }: {
   task: BreakdownTask;
-  depth?: number;
-  onChange: (t: BreakdownTask) => void;
+  onChange: (next: BreakdownTask) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(task);
-
-  const save = () => {
-    onChange(draft);
-    setEditing(false);
-  };
-
   return (
-    <div className="draft-task" style={{ marginLeft: depth * 16 }}>
-      {editing ? (
-        <div className="form-stack" style={{ gap: 4 }}>
-          <input
-            value={draft.title}
-            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-          />
-          <input
-            value={draft.description}
-            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-          />
-          <div className="row-actions">
-            <button className="btn-primary" onClick={save}>
-              保存
-            </button>
-            <button className="btn-secondary" onClick={() => setEditing(false)}>
-              取消
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="draft-task-row">
-          <div>
-            <strong>{task.title}</strong>
-            <span className="badge status-in_progress">{task.priority}</span>
-            <span className="badge">{task.estimatedMinutes} 分钟</span>
-            <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "0.85rem" }}>
-              {task.description}
-            </p>
-          </div>
-          <button className="btn-secondary" onClick={() => setEditing(true)}>
-            编辑
-          </button>
-        </div>
-      )}
-      {task.subTasks?.map((sub, i) => (
-        <TaskItem
-          key={i}
-          task={sub}
-          depth={depth + 1}
-          onChange={(next) => {
-            const subs = [...(task.subTasks ?? [])];
-            subs[i] = next;
-            onChange({ ...task, subTasks: subs });
-          }}
+    <div className="task-item">
+      <input
+        value={task.title}
+        onChange={(e) => onChange({ ...task, title: e.target.value })}
+        className="task-title-input"
+      />
+      <textarea
+        value={task.description}
+        onChange={(e) => onChange({ ...task, description: e.target.value })}
+        rows={2}
+        className="task-desc-input"
+        placeholder="任务描述"
+      />
+      <div className="task-meta">
+        <input
+          type="number"
+          min={0}
+          value={task.estimatedMinutes}
+          onChange={(e) =>
+            onChange({ ...task, estimatedMinutes: Number(e.target.value) })
+          }
+          className="task-minutes-input"
         />
-      ))}
-    </div>
-  );
-}
-
-function DraftPreview({
-  preview,
-  onChange,
-  onConfirm,
-  onCancel,
-  status,
-}: {
-  preview: BreakdownPreview;
-  onChange: (p: BreakdownPreview) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
-  status: DraftStatus;
-}) {
-  return (
-    <div className="draft-box">
-      <h3>草稿预览：{preview.projectName}</h3>
-      <p style={{ color: "var(--muted)" }}>{preview.goal}</p>
-
-      {preview.phases.map((phase, pi) => (
-        <div key={pi} className="draft-phase">
-          <h4>
-            {phase.name} <span className="badge">{phase.weeks} 周</span>
-          </h4>
-          {phase.tasks.map((task, ti) => (
-            <TaskItem
-              key={ti}
-              task={task}
-              onChange={(next) => {
-                const phases = [...preview.phases];
-                phases[pi].tasks[ti] = next;
-                onChange({ ...preview, phases });
-              }}
-            />
-          ))}
-        </div>
-      ))}
-
-      <div className="draft-first-action">
-        <h4>首个可执行动作</h4>
-        <div className="draft-task-row">
-          <div>
-            <strong>{preview.firstAction.title}</strong>
-            <span className="badge status-in_progress">
-              {preview.firstAction.priority}
-            </span>
-            <span className="badge">{preview.firstAction.estimatedMinutes} 分钟</span>
-            <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "0.85rem" }}>
-              {preview.firstAction.description}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="form-actions" style={{ marginTop: 16 }}>
-        <button
-          className="btn-primary"
-          onClick={onConfirm}
-          disabled={status === "committing"}
+        <span>分钟</span>
+        <select
+          value={task.priority}
+          onChange={(e) =>
+            onChange({
+              ...task,
+              priority: e.target.value as BreakdownTask["priority"],
+            })
+          }
+          className="task-priority-select"
         >
-          {status === "committing" ? "确认中…" : "确认创建"}
-        </button>
-        <button className="btn-secondary" onClick={onCancel}>
-          取消
-        </button>
+          <option value="LOW">低</option>
+          <option value="MEDIUM">中</option>
+          <option value="HIGH">高</option>
+          <option value="URGENT">紧急</option>
+        </select>
       </div>
     </div>
   );
@@ -148,40 +58,88 @@ function DraftPreview({
 export function AiBreakdownPage() {
   const [goal, setGoal] = useState("");
   const [weeks, setWeeks] = useState(4);
-  const [status, setStatus] = useState<DraftStatus>("idle");
   const [preview, setPreview] = useState<BreakdownPreview | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [committed, setCommitted] = useState(false);
+
+  const { createProject } = useProjects();
+  const { createTask } = useTasks();
 
   const handleGenerate = async () => {
-    if (!goal.trim()) return;
-    setStatus("loading");
+    if (!goal.trim()) {
+      setError("请输入学习目标");
+      return;
+    }
+    setLoading(true);
     setError(null);
-    try {
-      const data = await aiService.previewBreakdown(goal.trim(), weeks);
-      setPreview(data);
-      setStatus("preview");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setStatus("error");
-    }
-  };
-
-  const handleConfirm = async () => {
-    if (!preview) return;
-    setStatus("committing");
-    try {
-      await aiService.commitBreakdown(preview);
-      setStatus("done");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setStatus("error");
-    }
-  };
-
-  const handleCancel = () => {
     setPreview(null);
-    setStatus("idle");
+    setCommitted(false);
+    try {
+      const result = await aiService.previewBreakdown(goal.trim(), weeks);
+      setPreview(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updatePhase = (pi: number, next: BreakdownPhase) => {
+    if (!preview) return;
+    const phases = [...preview.phases];
+    phases[pi] = next;
+    setPreview({ ...preview, phases });
+  };
+
+  const updateTask = (pi: number, ti: number, next: BreakdownTask) => {
+    if (!preview) return;
+    const phases = preview.phases.map((ph, idx) =>
+      idx === pi
+        ? { ...ph, tasks: ph.tasks.map((t, tidx) => (tidx === ti ? next : t)) }
+        : ph
+    );
+    setPreview({ ...preview, phases });
+  };
+
+  const handleCommit = async () => {
+    if (!preview) return;
+    setLoading(true);
     setError(null);
+    try {
+      // 1. 创建项目
+      const project = await createProject({
+        name: preview.projectName || goal,
+        goal,
+        startDate: new Date().toISOString().slice(0, 10),
+        endDate: new Date(Date.now() + weeks * 7 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .slice(0, 10),
+        status: "ACTIVE",
+        progress: 0,
+      });
+
+      // 2. 为每个阶段创建任务
+      for (const phase of preview.phases) {
+        for (const task of phase.tasks) {
+          await createTask(project.id, {
+            title: task.title,
+            description: task.description,
+            status: "TODO",
+            priority: task.priority,
+            dueTime: "",
+            estimatedMinutes: task.estimatedMinutes,
+            tags: [phase.name],
+          });
+        }
+      }
+
+      setCommitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -189,17 +147,18 @@ export function AiBreakdownPage() {
       <section className="panel ai-panel">
         <div className="panel-heading">
           <h2>AI 智能拆解草稿</h2>
-          <p>AI 只生成预览，你接受方案后才创建项目和任务。</p>
+          <p>输入学习目标，AI 将生成可执行的阶段和任务树，确认后一键创建。</p>
         </div>
 
         <div className="ai-form">
           <label>
             学习目标
             <textarea
-              placeholder="例如：4 周内完成软件工程课程项目核心功能"
-              rows={5}
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
+              placeholder="例如：4 周内完成软件工程课程项目核心功能"
+              rows={5}
+              disabled={loading}
             />
           </label>
           <label>
@@ -210,43 +169,85 @@ export function AiBreakdownPage() {
               max={52}
               value={weeks}
               onChange={(e) => setWeeks(Number(e.target.value))}
+              disabled={loading}
             />
           </label>
           <button
             type="button"
             className="btn-primary"
             onClick={handleGenerate}
-            disabled={status === "loading" || !goal.trim()}
+            disabled={loading || !goal.trim()}
           >
-            {status === "loading" ? "生成中…" : "生成草稿"}
+            {loading && !preview ? "生成中…" : "生成草稿"}
           </button>
         </div>
 
-        {status === "error" && (
+        {error && (
           <div className="state-message state-failure" role="alert">
             {error}
-            <div style={{ marginTop: 8 }}>
-              <button className="btn-secondary" onClick={() => setStatus("idle")}>
-                重试
-              </button>
+          </div>
+        )}
+
+        {committed && (
+          <div className="state-message state-success" role="status">
+            项目与任务已创建成功！请前往「学习项目」和「任务管理」查看。
+          </div>
+        )}
+
+        {preview && !committed && (
+          <div className="draft-box">
+            <div className="draft-header">
+              <h3>草稿预览：{preview.projectName || goal}</h3>
+              <div className="draft-actions">
+                <button
+                  className="btn-primary"
+                  onClick={handleCommit}
+                  disabled={loading}
+                >
+                  {loading ? "创建中…" : "确认创建"}
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={() => setPreview(null)}
+                  disabled={loading}
+                >
+                  取消
+                </button>
+              </div>
             </div>
-          </div>
-        )}
 
-        {status === "done" && (
-          <div className="state-message" style={{ background: "var(--accent-soft)" }}>
-            项目与任务已创建成功！去「任务管理」查看吧。
-          </div>
-        )}
+            {preview.firstAction && (
+              <div className="first-action">
+                <strong>首个行动：</strong>
+                <span>{preview.firstAction.title}</span>
+                <p>{preview.firstAction.description}</p>
+              </div>
+            )}
 
-        {preview && status !== "done" && (
-          <DraftPreview
-            preview={preview}
-            onChange={setPreview}
-            onConfirm={handleConfirm}
-            onCancel={handleCancel}
-            status={status}
-          />
+            {preview.phases.map((phase, pi) => (
+              <div className="phase-card" key={pi}>
+                <div className="phase-header">
+                  <input
+                    value={phase.name}
+                    onChange={(e) =>
+                      updatePhase(pi, { ...phase, name: e.target.value })
+                    }
+                    className="phase-name-input"
+                  />
+                  <span className="phase-weeks">{phase.weeks} 周</span>
+                </div>
+                <div className="task-list">
+                  {phase.tasks.map((task, ti) => (
+                    <TaskItem
+                      key={ti}
+                      task={task}
+                      onChange={(next) => updateTask(pi, ti, next)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </section>
     </section>

@@ -82,6 +82,12 @@ export const apiClient = {
     request<DashboardSummary>("/dashboard/today"),
   listProjects: () => request<Project[]>("/projects"),
   listTasks: () => request<Task[]>("/tasks"),
+  // TODO(前后端联调): AI 接口必须返回草稿结构，前端确认前不能直接创建正式任务。
+  previewAiBreakdown: (payload: { goal: string; weeks: number }) =>
+    request<unknown>("/ai/breakdown-preview", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   // ── Sync & Conflict ──────────────────────────────────────────
 

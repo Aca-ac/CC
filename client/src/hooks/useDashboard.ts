@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { taskRepository } from "../storage/repositories/taskRepository";
-import { projectRepository } from "../storage/repositories/projectRepository";
 import { apiClient } from "../services/apiClient";
 import type { DashboardSummary, Task } from "../types/domain";
 import type { TaskValue } from "../storage/db";

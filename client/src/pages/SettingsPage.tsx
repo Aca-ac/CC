@@ -1,49 +1,48 @@
 import { useState } from "react";
 import {
-  type AiProvider,
   loadAiSettings,
   saveAiSettings,
   maskKey,
   isPublicHttp,
+  type AiProvider,
+  type AiSettings,
 } from "../services/aiService";
 
-const PROVIDER_MODELS: Record<AiProvider, string[]> = {
-  openai: ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
-  anthropic: ["claude-3-haiku", "claude-3-sonnet", "claude-3-opus"],
-  deepseek: ["deepseek-chat", "deepseek-coder"],
-  local: ["local-model"],
-};
+const PROVIDER_OPTIONS: { value: AiProvider; label: string }[] = [
+  { value: "openai", label: "OpenAI" },
+  { value: "anthropic", label: "Anthropic" },
+  { value: "deepseek", label: "DeepSeek" },
+  { value: "local", label: "本地模型" },
+];
 
-const PROVIDER_LABELS: Record<AiProvider, string> = {
-  openai: "OpenAI",
-  anthropic: "Anthropic",
-  deepseek: "DeepSeek",
-  local: "本地模型",
+const MODEL_PRESETS: Record<AiProvider, string[]> = {
+  openai: ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
+  anthropic: ["claude-3-haiku-20240307", "claude-3-sonnet-20240229", "claude-3-opus-20240229"],
+  deepseek: ["deepseek-chat", "deepseek-coder"],
+  local: ["llama3", "qwen2", "custom"],
 };
 
 export function SettingsPage() {
-  const [settings, setSettings] = useState(loadAiSettings);
-  const [keyInput, setKeyInput] = useState("");
+  const [settings, setSettings] = useState<AiSettings>(loadAiSettings);
+  const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
-  const publicHttp = isPublicHttp();
 
-  const handleSave = () => {
-    const next = {
-      ...settings,
-      apiKey: keyInput.trim() || settings.apiKey,
-    };
-    saveAiSettings(next);
+  const publicHttp = isPublicHttp();
+  const provider = settings.provider;
+
+  const update = (partial: Partial<AiSettings>) => {
+    const next = { ...settings, ...partial };
+    if (partial.provider && partial.provider !== provider) {
+      next.model = MODEL_PRESETS[partial.provider][0];
+    }
     setSettings(next);
-    setKeyInput("");
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setSaved(false);
   };
 
-  const handleClearKey = () => {
-    const next = { ...settings, apiKey: "" };
-    saveAiSettings(next);
-    setSettings(next);
-    setKeyInput("");
+  const handleSave = () => {
+    saveAiSettings(settings);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
 
   return (
@@ -51,75 +50,32 @@ export function SettingsPage() {
       <section className="panel">
         <div className="panel-heading">
           <h2>系统设置</h2>
-          <p>管理 AI 供应商、模型、密钥和隐私选项。</p>
-        </div>
-        <div className="settings-list">
-          <label>
-            <span>AI 功能</span>
-            <input
-              type="checkbox"
-              checked={settings.provider !== "local"}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  provider: e.target.checked ? "openai" : "local",
-                }))
-              }
-            />
-          </label>
-          <label>
-            <span>本地优先同步</span>
-            <input type="checkbox" defaultChecked />
-          </label>
-          <label>
-            <span>番茄钟提醒</span>
-            <input type="checkbox" />
-          </label>
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>AI 设置</h2>
-          <p>配置 AI 供应商、模型和 API Key。</p>
         </div>
 
-        {publicHttp && (
-          <div className="state-message state-failure" role="alert">
-            当前使用公网 HTTP 连接，BYOK（自带密钥）已禁用，请使用 HTTPS 或本地部署。
-          </div>
-        )}
+        <div className="settings-group">
+          <h3>AI 配置</h3>
 
-        <div className="form-stack">
-          <label>
-            AI 供应商
+          <label className="settings-row">
+            <span>AI Provider</span>
             <select
-              value={settings.provider}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  provider: e.target.value as AiProvider,
-                  model: PROVIDER_MODELS[e.target.value as AiProvider][0],
-                }))
-              }
+              value={provider}
+              onChange={(e) => update({ provider: e.target.value as AiProvider })}
             >
-              {(Object.keys(PROVIDER_MODELS) as AiProvider[]).map((p) => (
-                <option key={p} value={p}>
-                  {PROVIDER_LABELS[p]}
+              {PROVIDER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>
           </label>
 
-          <label>
-            模型
+          <label className="settings-row">
+            <span>模型</span>
             <select
               value={settings.model}
-              onChange={(e) =>
-                setSettings((s) => ({ ...s, model: e.target.value }))
-              }
+              onChange={(e) => update({ model: e.target.value })}
             >
-              {PROVIDER_MODELS[settings.provider].map((m) => (
+              {MODEL_PRESETS[provider].map((m) => (
                 <option key={m} value={m}>
                   {m}
                 </option>
@@ -127,48 +83,65 @@ export function SettingsPage() {
             </select>
           </label>
 
-          <label>
-            API Key
-            <div style={{ display: "flex", gap: "8px" }}>
+          <label className="settings-row">
+            <span>API Key</span>
+            <div className="input-with-toggle">
               <input
-                type="password"
-                value={keyInput}
-                placeholder={settings.apiKey ? maskKey(settings.apiKey) : "输入 API Key"}
-                onChange={(e) => setKeyInput(e.target.value)}
+                type={showKey ? "text" : "password"}
+                value={settings.apiKey}
+                onChange={(e) => update({ apiKey: e.target.value })}
+                placeholder={publicHttp ? "公网 HTTP 禁止输入 Key" : "sk-..."}
                 disabled={publicHttp}
-                style={{ flex: 1 }}
               />
-              {settings.apiKey && (
-                <button className="btn-secondary" onClick={handleClearKey}>
-                  清除
-                </button>
-              )}
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowKey((v) => !v)}
+              >
+                {showKey ? "隐藏" : "显示"}
+              </button>
             </div>
           </label>
 
-          <label>
-            <span>启用 Fallback（失败时自动切换供应商）</span>
+          {publicHttp && (
+            <div className="state-message state-failure">
+              当前使用公网 HTTP，禁止输入 API Key。请切换 HTTPS 或本地环境。
+            </div>
+          )}
+
+          {!publicHttp && settings.apiKey && (
+            <div className="key-mask">{maskKey(settings.apiKey)}</div>
+          )}
+
+          <label className="settings-row checkbox-row">
+            <span>未配置时允许 Fallback（Mock 响应）</span>
             <input
               type="checkbox"
               checked={settings.fallbackEnabled}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  fallbackEnabled: e.target.checked,
-                }))
-              }
+              onChange={(e) => update({ fallbackEnabled: e.target.checked })}
             />
           </label>
 
           <div className="form-actions">
-            <button
-              className="btn-primary"
-              onClick={handleSave}
-              disabled={publicHttp}
-            >
-              {saved ? "已保存" : "保存设置"}
+            <button className="btn-primary" onClick={handleSave}>
+              保存设置
             </button>
+            {saved && <span className="save-hint">已保存</span>}
           </div>
+        </div>
+
+        <hr />
+
+        <div className="settings-group">
+          <h3>同步与提醒</h3>
+          <label className="settings-row checkbox-row">
+            <span>本地优先同步</span>
+            <input type="checkbox" defaultChecked disabled />
+          </label>
+          <label className="settings-row checkbox-row">
+            <span>番茄钟提醒</span>
+            <input type="checkbox" />
+          </label>
         </div>
       </section>
     </section>
