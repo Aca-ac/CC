@@ -1,4 +1,4 @@
-import type { DashboardSummary, Project, Task } from "../types/domain";
+import type { AuthSession, DashboardSummary, Project, Task } from "../types/domain";
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -7,79 +7,79 @@ export interface ApiResponse<T> {
   data: T;
 }
 
-/** 同步推送请求中的单条变更记录 */
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  password: string;
+}
+
 export interface SyncRecordItem {
   entityType: "PROJECT" | "TASK" | "LOG";
   entityId: string;
   changeType: "CREATE" | "UPDATE" | "DELETE";
   version: number;
-  payload: unknown;
+  payload: Record<string, unknown>;
 }
 
-/** 同步推送响应 */
-export interface SyncPushResult {
-  accepted: number;
-  conflictTotal: number;
-  conflicts: ConflictDto[];
+const API_URL_KEY = "chronos:apiUrl";
+const TOKEN_KEY = "chronos:session";
+
+function getApiBaseUrl(): string {
+  return localStorage.getItem(API_URL_KEY) ?? import.meta.env.VITE_API_BASE_URL ?? "/api";
 }
 
-/** 冲突记录 DTO（服务端返回） */
-export interface ConflictDto {
-  id: string;
-  entityType: "PROJECT" | "TASK" | "LOG";
-  entityId: string;
-  serverVersion: number;
-  clientVersion: number;
-  serverPayload: unknown;
-  clientPayload: unknown;
-  serverUpdatedAt: string;
-  clientUpdatedAt: string;
+function getToken(): string | null {
+  try {
+    const raw = localStorage.getItem(TOKEN_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw) as AuthSession;
+    return session.token ?? null;
+  } catch { return null; }
 }
-
-/** 同步拉取响应 */
-export interface SyncPullResult {
-  cursor: string;
-  changes: SyncRecordItem[];
-}
-
-/** 冲突解决请求 */
-export interface ResolveConflictRequest {
-  resolution: "keep-local" | "keep-cloud";
-}
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  });
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> ?? {}),
+  };
+  if (token) headers["satoken"] = token;
+
+  const response = await fetch(`${getApiBaseUrl()}${path}`, { headers, ...init });
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem(TOKEN_KEY);
+      window.location.hash = "#/login";
+    }
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
   const body = (await response.json()) as ApiResponse<T>;
-  if (!body.success) {
-    throw new Error(`${body.code}: ${body.message}`);
-  }
-
+  if (!body.success) throw new Error(`${body.code}: ${body.message}`);
   return body.data;
 }
 
 export const apiClient = {
   health: () => request<{ status: string; service: string }>("/health"),
+
+  login: (payload: LoginRequest) =>
+    request<AuthSession>("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
+
+  register: (payload: RegisterRequest) =>
+    request<void>("/auth/register", { method: "POST", body: JSON.stringify(payload) }),
+
+  logout: () => request<void>("/auth/logout", { method: "POST" }),
+
   get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body: unknown) =>
-    request<T>(path, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-  getTodayDashboard: () =>
-    request<DashboardSummary>("/dashboard/today"),
+  post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(body) }),
+
+  getTodayDashboard: () => request<DashboardSummary>("/dashboard/today"),
   listProjects: () => request<Project[]>("/projects"),
   listTasks: () => request<Task[]>("/tasks"),
   // TODO(前后端联调): AI 接口必须返回草稿结构，前端确认前不能直接创建正式任务。
@@ -89,26 +89,15 @@ export const apiClient = {
       body: JSON.stringify(payload),
     }),
 
-  // ── Sync & Conflict ──────────────────────────────────────────
+  previewAiBreakdown: (payload: { goal: string; weeks: number }) =>
+    request<unknown>("/ai/breakdown-preview", { method: "POST", body: JSON.stringify(payload) }),
 
-  /** 推送本地变更到服务端，返回被接受的条目数和冲突列表 */
   syncPush: (records: SyncRecordItem[]) =>
-    request<SyncPushResult>("/sync/push", {
-      method: "POST",
-      body: JSON.stringify({ records }),
-    }),
+    request<{ accepted: number; conflicts: Array<{ id: string; entityType: string; entityId: string; clientPayload: unknown; serverPayload: unknown }> }>("/sync/push", { method: "POST", body: JSON.stringify({ records }) }),
 
-  /** 从服务端拉取远端变更 */
-  syncPull: (cursor?: string) => {
-    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-    return request<SyncPullResult>(`/sync/pull${query}`);
-  },
+  syncPull: (cursor?: string) =>
+    request<{ changes: SyncRecordItem[]; cursor: string }>(`/sync/pull${cursor ? `?cursor=${cursor}` : ""}`),
 
-  /** 提交冲突解决结果：keep-local 或 keep-cloud */
-  resolveConflict: (conflictId: string, body: ResolveConflictRequest) =>
-    request<void>(`/sync/conflicts/${conflictId}/resolve`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+  resolveConflict: (conflictId: string, payload: { resolution: "keep-local" | "keep-cloud" }) =>
+    request<void>("/sync/resolve", { method: "POST", body: JSON.stringify({ id: conflictId, ...payload }) }),
 };
-

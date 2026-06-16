@@ -16,6 +16,13 @@ export interface User {
   role: "STUDENT" | "ADMIN";
 }
 
+export interface AuthSession {
+  userId: string;
+  name: string;
+  email: string;
+  token: string;
+}
+
 export interface Project {
   id: EntityId;
   name: string;

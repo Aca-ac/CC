@@ -48,6 +48,7 @@ export function CalendarPage() {
       <section className="panel">
         <div className="panel-heading">
           <h2>周视图与任务分布</h2>
+          <p>用一周视角检查任务截止时间和学习节奏。</p>
         </div>
 
         {loading && <div className="state-message">加载中…</div>}
