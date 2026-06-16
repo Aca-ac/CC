@@ -16,6 +16,8 @@ desktop.ini
 # Node / frontend
 node_modules/
 .npm-cache/
+node_modules_old/
+client/build/
 client/dist/
 client/dist-electron/
 client/release/

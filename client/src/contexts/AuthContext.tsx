@@ -1,4 +1,5 @@
 import { createContext, useCallback, useEffect, useState } from "react";
+import { getApiBaseUrl } from "../services/apiClient";
 
 export interface AuthSession {
   userId: string;
@@ -27,9 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
-  const [apiBaseUrl, setApiBaseUrlState] = useState(() =>
-    localStorage.getItem(API_URL_KEY) ?? "/api"
-  );
+  const [apiBaseUrl, setApiBaseUrlState] = useState(getApiBaseUrl);
 
   useEffect(() => {
     try {

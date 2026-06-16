@@ -2,10 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { taskRepository } from "../storage/repositories/taskRepository";
 import { outboxRepository } from "../storage/repositories/outboxRepository";
 import { apiClient } from "../services/apiClient";
+import { useAccountId } from "./useAccountId";
 import type { TaskValue } from "../storage/db";
 import type { Task, TaskStatus } from "../types/domain";
-
-const ACCOUNT_ID = "local"; // TODO: 从 auth context 获取真实 accountId
 
 function toDomain(t: TaskValue): Task {
   return {
@@ -38,27 +37,28 @@ export interface UseTasksReturn {
 }
 
 export function useTasks(): UseTasksReturn {
+  const accountId = useAccountId();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [online, setOnline] = useState(navigator.onLine);
 
   const loadLocal = useCallback(async () => {
-    const list = await taskRepository.findAll(ACCOUNT_ID);
+    const list = await taskRepository.findAll(accountId);
     setTasks(list.filter((t) => !t.deleted).map(toDomain));
-  }, []);
+  }, [accountId]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      if (navigator.onLine) {
+      if (navigator.onLine && accountId !== "local") {
         const remote = await apiClient.listTasks();
         for (const r of remote) {
           const existing = await taskRepository.findById(r.id);
           const value: TaskValue = {
             ...r,
-            accountId: ACCOUNT_ID,
+            accountId,
             actualMinutes: existing?.actualMinutes ?? 0,
             createdAt: existing?.createdAt ?? Date.now(),
             updatedAt: Date.now(),
@@ -77,13 +77,13 @@ export function useTasks(): UseTasksReturn {
       await loadLocal();
       setLoading(false);
     }
-  }, [loadLocal]);
+  }, [accountId, loadLocal]);
 
   const enqueue = useCallback(
     async (operation: "CREATE" | "UPDATE" | "DELETE", entityId: string, payload: unknown) => {
       await outboxRepository.create({
         mutationId: crypto.randomUUID(),
-        accountId: ACCOUNT_ID,
+        accountId,
         operation,
         entityType: "TASK",
         entityId,
@@ -94,7 +94,7 @@ export function useTasks(): UseTasksReturn {
         updatedAt: Date.now(),
       });
     },
-    []
+    [accountId]
   );
 
   const createTask = useCallback(
@@ -106,7 +106,7 @@ export function useTasks(): UseTasksReturn {
       const task: TaskValue = {
         ...data,
         id: crypto.randomUUID(),
-        accountId: ACCOUNT_ID,
+        accountId,
         projectId,
         actualMinutes: 0,
         createdAt: now,
