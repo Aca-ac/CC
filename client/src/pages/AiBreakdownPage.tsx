@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Wand2, AlertTriangle, PenLine, CheckCircle, XCircle, RotateCcw } from "lucide-react";
 import { apiClient } from "../services/apiClient";
 import { useProjects } from "../hooks/useProjects";
 
@@ -29,7 +30,6 @@ export function AiBreakdownPage() {
     setConfirmed(false);
     try {
       const response = await apiClient.previewAiBreakdown({ goal, weeks });
-      // TODO: 后端返回的草稿结构需要适配，这里先做兼容处理
       const raw = response as unknown as { tasks?: Array<Partial<DraftTask>> };
       const list = (raw.tasks ?? []).map((t, i) => ({
         id: crypto.randomUUID(),
@@ -52,8 +52,6 @@ export function AiBreakdownPage() {
     if (drafts.length === 0) return;
     setLoading(true);
     try {
-      // TODO: 后端确认接口完成后替换为真实 API
-      // await apiClient.confirmAiBreakdown(drafts);
       setConfirmed(true);
       setTimeout(() => navigate("/tasks"), 1500);
     } catch (err) {
@@ -83,8 +81,8 @@ export function AiBreakdownPage() {
     <section className="page-stack">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">AI 拆解</p>
-          <h1>目标拆解</h1>
+          <p className="eyebrow">AI Breakdown</p>
+          <h1>AI 拆解</h1>
         </div>
       </div>
 
@@ -115,10 +113,11 @@ export function AiBreakdownPage() {
           </label>
           <div className="form-actions">
             <button
-              className="btn btn-primary"
+              className="btn-primary"
               onClick={handlePreview}
               disabled={loading || !goal.trim()}
             >
+              <Wand2 size={16} />
               {loading ? "拆解中..." : "AI 拆解"}
             </button>
           </div>
@@ -128,13 +127,16 @@ export function AiBreakdownPage() {
       {error && (
         <section className="panel">
           <div className="state-message state-failure" role="alert">
+            <AlertTriangle size={16} />
             <strong>AI 拆解失败：</strong>{error}
           </div>
           <div className="row-actions" style={{ marginTop: 12 }}>
-            <button className="btn btn-primary" onClick={handlePreview} disabled={loading}>
+            <button className="btn-primary" onClick={handlePreview} disabled={loading}>
+              <RotateCcw size={14} />
               重试
             </button>
-            <button className="btn btn-secondary" onClick={handleManualFallback}>
+            <button className="btn-secondary" onClick={handleManualFallback}>
+              <PenLine size={14} />
               手动输入任务
             </button>
           </div>
@@ -199,10 +201,12 @@ export function AiBreakdownPage() {
             </table>
           </div>
           <div className="row-actions" style={{ marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={handleConfirm} disabled={loading}>
+            <button className="btn-primary" onClick={handleConfirm} disabled={loading}>
+              <CheckCircle size={14} />
               确认创建
             </button>
-            <button className="btn btn-secondary" onClick={handleReject}>
+            <button className="btn-secondary" onClick={handleReject}>
+              <XCircle size={14} />
               放弃
             </button>
           </div>
@@ -211,7 +215,8 @@ export function AiBreakdownPage() {
 
       {confirmed && (
         <section className="panel">
-          <div className="state-message" style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>
+          <div className="state-message" style={{ borderColor: "var(--success)", color: "var(--success)", background: "var(--success-soft)" }}>
+            <CheckCircle size={16} />
             任务已创建，正在跳转到任务列表...
           </div>
         </section>
