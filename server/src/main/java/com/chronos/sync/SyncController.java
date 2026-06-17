@@ -5,6 +5,7 @@ import com.chronos.sync.dto.SyncPullResponse;
 import com.chronos.sync.dto.SyncPushRequest;
 import com.chronos.sync.dto.SyncPushResponse;
 import com.chronos.sync.dto.SyncResolveRequest;
+import com.chronos.sync.dto.SyncResolveResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,8 +34,7 @@ public class SyncController {
     }
 
     @PostMapping("/resolve")
-    public ApiResponse<Void> resolve(@RequestBody SyncResolveRequest request) {
-        syncService.resolve(request.id(), request.resolution());
-        return ApiResponse.ok(null);
+    public ApiResponse<SyncResolveResponse> resolve(@Valid @RequestBody SyncResolveRequest request) {
+        return ApiResponse.ok(syncService.resolve(request));
     }
 }

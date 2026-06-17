@@ -12,6 +12,8 @@ public class FocusSession {
     @TableId(type = IdType.ASSIGN_ID)
     private String id;
     private String taskId;
+    private String userId;
+    private String projectId;
     private LocalDateTime startedAt;
     private Integer durationMinutes;
     private Boolean completed;
