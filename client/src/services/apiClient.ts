@@ -45,7 +45,7 @@ export interface TimerStopRequest {
 const API_URL_KEY = "chronos:apiUrl";
 const TOKEN_KEY = "chronos:session";
 
-function getApiBaseUrl(): string {
+export function getApiBaseUrl(): string {
   return localStorage.getItem(API_URL_KEY) ?? import.meta.env.VITE_API_BASE_URL ?? "/api";
 }
 
@@ -94,6 +94,8 @@ export const apiClient = {
 
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(body) }),
+  postWithHeaders: <T>(path: string, body: unknown, headers: Record<string, string>) =>
+    request<T>(path, { method: "POST", headers, body: JSON.stringify(body) }),
 
   getTodayDashboard: () => request<DashboardSummary>("/dashboard/today"),
   listProjects: () => request<Project[]>("/projects"),

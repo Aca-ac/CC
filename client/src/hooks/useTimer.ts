@@ -3,18 +3,8 @@ import { focusSessionRepository } from "../storage/repositories/focusSessionRepo
 import { timerStateRepository } from "../storage/repositories/timerStateRepository";
 import { outboxRepository } from "../storage/repositories/outboxRepository";
 import { apiClient } from "../services/apiClient";
+import { useAccountId } from "./useAccountId";
 import type { FocusSessionValue } from "../storage/db";
-
-function getAccountId(): string {
-  try {
-    const raw = localStorage.getItem("chronos:session");
-    if (raw) {
-      const session = JSON.parse(raw) as { userId: string };
-      if (session.userId) return session.userId;
-    }
-  } catch { /* ignore */ }
-  return "local";
-}
 
 export interface TimerState {
   active: boolean;
@@ -38,6 +28,7 @@ export interface UseTimerReturn {
 }
 
 export function useTimer(): UseTimerReturn {
+  const accountId = useAccountId();
   const [timer, setTimer] = useState<TimerState>({
     active: false,
     elapsedSeconds: 0,
@@ -67,7 +58,6 @@ export function useTimer(): UseTimerReturn {
 
   const enqueue = useCallback(
     async (operation: "CREATE" | "UPDATE" | "DELETE", entityId: string, payload: unknown) => {
-      const accountId = getAccountId();
       await outboxRepository.create({
         mutationId: crypto.randomUUID(),
         accountId,
@@ -81,12 +71,11 @@ export function useTimer(): UseTimerReturn {
         updatedAt: Date.now(),
       });
     },
-    []
+    [accountId]
   );
 
   const startTimer = useCallback(
     async (projectId: string, taskId?: string) => {
-      const accountId = getAccountId();
       setTimer((prev) => ({ ...prev, error: null }));
 
       // 每个账户只能有一个活跃计时器
@@ -142,7 +131,7 @@ export function useTimer(): UseTimerReturn {
       });
       startTick();
     },
-    [enqueue, startTick]
+    [accountId, enqueue, startTick]
   );
 
   const stopTimer = useCallback(async () => {
@@ -156,7 +145,7 @@ export function useTimer(): UseTimerReturn {
       endTime: now,
       durationMinutes: elapsedMinutes,
     });
-    await timerStateRepository.clear(getAccountId());
+    await timerStateRepository.clear(accountId);
     await enqueue("UPDATE", timer.sessionId, {
       endTime: now,
       durationMinutes: elapsedMinutes,
@@ -164,14 +153,14 @@ export function useTimer(): UseTimerReturn {
 
     // 尝试通知服务端
     try {
-      await apiClient.stopTimer(timer.sessionId, { durationMinutes });
+      await apiClient.stopTimer(timer.sessionId, { durationMinutes: elapsedMinutes });
     } catch {
       // 离线时进入 outbox
     }
 
     clearTick();
     setTimer({ active: false, elapsedSeconds: 0, restoring: false, error: null });
-  }, [timer.active, timer.sessionId, timer.elapsedSeconds, enqueue, clearTick]);
+  }, [accountId, timer.active, timer.sessionId, timer.elapsedSeconds, enqueue, clearTick]);
 
   const discardTimer = useCallback(async () => {
     if (!timer.active || !timer.sessionId) return;
@@ -181,7 +170,7 @@ export function useTimer(): UseTimerReturn {
       discarded: true,
       endTime: Date.now(),
     });
-    await timerStateRepository.clear(getAccountId());
+    await timerStateRepository.clear(accountId);
     await enqueue("UPDATE", timer.sessionId, { discarded: true });
 
     try {
@@ -192,10 +181,9 @@ export function useTimer(): UseTimerReturn {
 
     clearTick();
     setTimer({ active: false, elapsedSeconds: 0, restoring: false, error: null });
-  }, [timer.active, timer.sessionId, enqueue, clearTick]);
+  }, [accountId, timer.active, timer.sessionId, enqueue, clearTick]);
 
   const restoreTimer = useCallback(async () => {
-    const accountId = getAccountId();
     setTimer((prev) => ({ ...prev, restoring: true, error: null }));
 
     try {
@@ -273,7 +261,7 @@ export function useTimer(): UseTimerReturn {
       error: null,
     });
     startTick();
-  }, [startTick]);
+  }, [accountId, startTick]);
 
   const clearError = useCallback(() => {
     setTimer((prev) => ({ ...prev, error: null }));
@@ -283,8 +271,7 @@ export function useTimer(): UseTimerReturn {
   useEffect(() => {
     restoreTimer();
     return () => clearTick();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [clearTick, restoreTimer]);
 
   return {
     timer,

@@ -2,19 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { projectRepository } from "../storage/repositories/projectRepository";
 import { outboxRepository } from "../storage/repositories/outboxRepository";
 import { apiClient } from "../services/apiClient";
+import { useAccountId } from "./useAccountId";
 import type { ProjectValue } from "../storage/db";
 import type { Project } from "../types/domain";
-
-function getAccountId(): string {
-  try {
-    const raw = localStorage.getItem("chronos:session");
-    if (raw) {
-      const session = JSON.parse(raw) as { userId: string };
-      if (session.userId) return session.userId;
-    }
-  } catch { /* ignore */ }
-  return "local";
-}
 
 function toDomain(p: ProjectValue): Project {
   return {
@@ -40,28 +30,29 @@ export interface UseProjectsReturn {
 }
 
 export function useProjects(): UseProjectsReturn {
+  const accountId = useAccountId();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [online, setOnline] = useState(navigator.onLine);
 
   const loadLocal = useCallback(async () => {
-    const list = await projectRepository.findAll(getAccountId());
+    const list = await projectRepository.findAll(accountId);
     setProjects(list.filter((p) => !p.deleted).map(toDomain));
-  }, []);
+  }, [accountId]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      if (navigator.onLine) {
+      if (navigator.onLine && accountId !== "local") {
         const remote = await apiClient.listProjects();
         // 将远端数据写入本地 IndexedDB（简单覆盖策略）
         for (const r of remote) {
           const existing = await projectRepository.findById(r.id);
           const value: ProjectValue = {
             ...r,
-            accountId: getAccountId(),
+            accountId,
             createdAt: existing?.createdAt ?? Date.now(),
             updatedAt: Date.now(),
             deleted: false,
@@ -79,13 +70,13 @@ export function useProjects(): UseProjectsReturn {
       await loadLocal();
       setLoading(false);
     }
-  }, [loadLocal]);
+  }, [accountId, loadLocal]);
 
   const enqueue = useCallback(
     async (operation: "CREATE" | "UPDATE" | "DELETE", entityId: string, payload: unknown) => {
       await outboxRepository.create({
         mutationId: crypto.randomUUID(),
-        accountId: getAccountId(),
+        accountId,
         operation,
         entityType: "PROJECT",
         entityId,
@@ -96,7 +87,7 @@ export function useProjects(): UseProjectsReturn {
         updatedAt: Date.now(),
       });
     },
-    []
+    [accountId]
   );
 
   const createProject = useCallback(
@@ -105,7 +96,7 @@ export function useProjects(): UseProjectsReturn {
       const project: ProjectValue = {
         ...data,
         id: crypto.randomUUID(),
-        accountId: getAccountId(),
+        accountId,
         createdAt: now,
         updatedAt: now,
         deleted: false,

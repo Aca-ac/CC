@@ -1,19 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { taskRepository } from "../storage/repositories/taskRepository";
 import { apiClient } from "../services/apiClient";
+import { useAccountId } from "./useAccountId";
 import type { DashboardSummary, Task } from "../types/domain";
 import type { TaskValue } from "../storage/db";
-
-function getAccountId(): string {
-  try {
-    const raw = localStorage.getItem("chronos:session");
-    if (raw) {
-      const session = JSON.parse(raw) as { userId: string };
-      if (session.userId) return session.userId;
-    }
-  } catch { /* ignore */ }
-  return "local";
-}
 
 function toDomain(t: TaskValue): Task {
   return {
@@ -60,6 +50,7 @@ function computeSummary(tasks: TaskValue[]): DashboardSummary {
 }
 
 export function useDashboard(): UseDashboardReturn {
+  const accountId = useAccountId();
   const [summary, setSummary] = useState<DashboardSummary>({
     todayTaskTotal: 0,
     completedTaskTotal: 0,
@@ -73,7 +64,7 @@ export function useDashboard(): UseDashboardReturn {
   const [online, setOnline] = useState(navigator.onLine);
 
   const loadLocal = useCallback(async () => {
-    const allTasks = await taskRepository.findAll(getAccountId());
+    const allTasks = await taskRepository.findAll(accountId);
     const activeTasks = allTasks.filter((t) => !t.deleted);
     setSummary(computeSummary(activeTasks));
 
@@ -82,13 +73,13 @@ export function useDashboard(): UseDashboardReturn {
       .filter((t) => t.dueTime && t.dueTime.startsWith(today))
       .map(toDomain);
     setTodayTasks(todayList);
-  }, []);
+  }, [accountId]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      if (navigator.onLine) {
+      if (navigator.onLine && accountId !== "local") {
         const remoteSummary = await apiClient.getTodayDashboard();
         // 拉取远端任务列表并合并到本地
         const remoteTasks = await apiClient.listTasks();
@@ -96,7 +87,7 @@ export function useDashboard(): UseDashboardReturn {
           const existing = await taskRepository.findById(r.id);
           const value: TaskValue = {
             ...r,
-            accountId: getAccountId(),
+            accountId,
             actualMinutes: existing?.actualMinutes ?? 0,
             createdAt: existing?.createdAt ?? Date.now(),
             updatedAt: Date.now(),
@@ -126,7 +117,7 @@ export function useDashboard(): UseDashboardReturn {
       await loadLocal();
       setLoading(false);
     }
-  }, [loadLocal]);
+  }, [accountId, loadLocal]);
 
   useEffect(() => {
     const handleOnline = () => setOnline(true);

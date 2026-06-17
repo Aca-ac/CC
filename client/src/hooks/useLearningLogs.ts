@@ -2,18 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { learningLogRepository } from "../storage/repositories/learningLogRepository";
 import { focusSessionRepository } from "../storage/repositories/focusSessionRepository";
 import { outboxRepository } from "../storage/repositories/outboxRepository";
+import { useAccountId } from "./useAccountId";
 import type { LearningLogValue, FocusSessionValue } from "../storage/db";
-
-function getAccountId(): string {
-  try {
-    const raw = localStorage.getItem("chronos:session");
-    if (raw) {
-      const session = JSON.parse(raw) as { userId: string };
-      if (session.userId) return session.userId;
-    }
-  } catch { /* ignore */ }
-  return "local";
-}
 
 export interface UnifiedLog {
   id: string;
@@ -66,12 +56,12 @@ function focusToUnified(session: FocusSessionValue): UnifiedLog {
 }
 
 export function useLearningLogs(): UseLearningLogsReturn {
+  const accountId = useAccountId();
   const [logs, setLogs] = useState<UnifiedLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadLocal = useCallback(async () => {
-    const accountId = getAccountId();
     const [manualLogs, sessions] = await Promise.all([
       learningLogRepository.findAll(accountId),
       focusSessionRepository.findNonDiscarded(accountId),
@@ -84,7 +74,7 @@ export function useLearningLogs(): UseLearningLogsReturn {
 
     unified.sort((a, b) => b.createdAt - a.createdAt);
     setLogs(unified);
-  }, []);
+  }, [accountId]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -100,7 +90,6 @@ export function useLearningLogs(): UseLearningLogsReturn {
 
   const enqueue = useCallback(
     async (operation: "CREATE" | "UPDATE" | "DELETE", entityId: string, payload: unknown) => {
-      const accountId = getAccountId();
       await outboxRepository.create({
         mutationId: crypto.randomUUID(),
         accountId,
@@ -114,7 +103,7 @@ export function useLearningLogs(): UseLearningLogsReturn {
         updatedAt: Date.now(),
       });
     },
-    []
+    [accountId]
   );
 
   const createManualLog = useCallback(
@@ -125,7 +114,7 @@ export function useLearningLogs(): UseLearningLogsReturn {
       const log: LearningLogValue = {
         ...data,
         id: crypto.randomUUID(),
-        accountId: getAccountId(),
+        accountId,
         createdAt: now,
         updatedAt: now,
         deleted: false,
