@@ -38,7 +38,8 @@ public class AiController {
     @PostMapping("/breakdown/preview")
     public ApiResponse<BreakdownTreeResponse> breakdownTreePreview(
             @Valid @RequestBody BreakdownTreePreviewRequest request) {
-        return ApiResponse.ok(aiService.previewBreakdownTree(request.goal(), request.weeks(), request.projectId()));
+        int weeks = request.weeks() == null ? 4 : request.weeks();
+        return ApiResponse.ok(aiService.previewBreakdownTree(request.goal(), weeks, request.projectId()));
     }
 
     @PostMapping("/breakdown/commit")

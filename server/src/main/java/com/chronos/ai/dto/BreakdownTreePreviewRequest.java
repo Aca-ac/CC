@@ -8,7 +8,7 @@ public record BreakdownTreePreviewRequest(
         String goal,
 
         @Min(value = 1, message = "计划周期至少 1 周")
-        int weeks,
+        Integer weeks,
 
         String projectId
 ) {

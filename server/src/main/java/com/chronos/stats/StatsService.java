@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.chronos.entity.*;
 import com.chronos.enums.TaskStatus;
 import com.chronos.mapper.*;
+import com.chronos.mapper.HabitMapper;
 import com.chronos.stats.dto.WeeklyStatsResponse;
 import org.springframework.stereotype.Service;
 
@@ -24,12 +25,12 @@ public class StatsService {
     private final HabitCheckinMapper habitCheckinMapper;
     private final LearningLogMapper learningLogMapper;
     private final ProjectMapper projectMapper;
-    private final com.chronos.mapper.HabitMapper habitMapper;
+    private final HabitMapper habitMapper;
 
     public StatsService(TaskMapper taskMapper, FocusSessionMapper focusSessionMapper,
                         HabitCheckinMapper habitCheckinMapper, LearningLogMapper learningLogMapper,
                         ProjectMapper projectMapper,
-                        com.chronos.mapper.HabitMapper habitMapper) {
+                        HabitMapper habitMapper) {
         this.taskMapper = taskMapper;
         this.focusSessionMapper = focusSessionMapper;
         this.habitCheckinMapper = habitCheckinMapper;

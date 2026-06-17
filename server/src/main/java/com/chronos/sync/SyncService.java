@@ -10,6 +10,8 @@ import com.chronos.sync.dto.SyncPushResponse;
 import com.chronos.sync.dto.SyncRecordDto;
 import com.chronos.sync.dto.SyncResolveRequest;
 import com.chronos.sync.dto.SyncResolveResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +24,10 @@ import java.util.stream.Collectors;
 
 @Service
 public class SyncService extends ServiceImpl<SyncRecordMapper, SyncRecord> {
+
+    private static final Logger log = LoggerFactory.getLogger(SyncService.class);
+    private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
 
     @Transactional(rollbackFor = Exception.class)
     public SyncPushResponse push(SyncPushRequest request) {
@@ -51,8 +57,7 @@ public class SyncService extends ServiceImpl<SyncRecordMapper, SyncRecord> {
 
                 if (dto.payload() != null) {
                     try {
-                        record.setPayload(new com.fasterxml.jackson.databind.ObjectMapper()
-                                .writeValueAsString(dto.payload()));
+                        record.setPayload(OBJECT_MAPPER.writeValueAsString(dto.payload()));
                     } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
                         record.setPayload("{}");
                     }
@@ -80,18 +85,17 @@ public class SyncService extends ServiceImpl<SyncRecordMapper, SyncRecord> {
                 .orderByDesc(SyncRecord::getLastModifiedAt)
         );
 
-        com.fasterxml.jackson.databind.ObjectMapper objectMapper =
-                new com.fasterxml.jackson.databind.ObjectMapper();
-
         List<SyncRecordDto> records = pendingRecords.stream()
             .map(record -> {
                 Map<String, Object> payload = null;
                 String rawPayload = record.getPayload();
                 if (rawPayload != null && !rawPayload.isBlank()) {
                     try {
-                        payload = objectMapper.readValue(rawPayload,
+                        payload = OBJECT_MAPPER.readValue(rawPayload,
                                 new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
                     } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                        log.warn("Failed to parse sync payload for entityType={} entityId={}",
+                                record.getEntityType(), record.getEntityId());
                         payload = Collections.emptyMap();
                     }
                 } else {
