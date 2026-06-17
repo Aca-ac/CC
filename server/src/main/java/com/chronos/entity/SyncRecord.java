@@ -13,7 +13,6 @@ import java.time.LocalDateTime;
 public class SyncRecord {
     @TableId(type = IdType.ASSIGN_ID)
     private String id;
-    private String userId;
     private String entityType;
     private String entityId;
     private String changeType;

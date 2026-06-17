@@ -7,92 +7,57 @@ import com.chronos.ai.dto.AiBreakdownPreviewResponse;
 import com.chronos.ai.dto.AiFeedbackRequest;
 import com.chronos.entity.AiAdvice;
 import com.chronos.mapper.AiAdviceMapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class AiService extends ServiceImpl<AiAdviceMapper, AiAdvice> {
 
-    private final ObjectMapper objectMapper;
-    private final AiProperties aiProperties;
-    private final OpenAiCompatibleClient openAiCompatibleClient;
-
-    public AiService(
-            ObjectMapper objectMapper,
-            AiProperties aiProperties,
-            OpenAiCompatibleClient openAiCompatibleClient
-    ) {
-        this.objectMapper = objectMapper;
-        this.aiProperties = aiProperties;
-        this.openAiCompatibleClient = openAiCompatibleClient;
-    }
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional(rollbackFor = Exception.class)
-    public AiBreakdownPreviewResponse previewBreakdown(
-            AiBreakdownPreviewRequest request,
-            AiProviderOverride override
-    ) {
-        String baseUrl = firstText(override.baseUrl(), aiProperties.getBaseUrl());
-        String model = firstText(override.model(), aiProperties.getModel());
-        String apiKey = firstText(override.apiKey(), aiProperties.getApiKey());
+    public AiBreakdownPreviewResponse previewBreakdown(AiBreakdownPreviewRequest request) {
+        List<String> stages = List.of("澄清目标范围", "拆分阶段任务", "确认本周最小行动");
+        String firstAction = "先完成一个可运行的 P0 闭环，再扩展 AI 复盘和课程表导入。";
+        Object loginId = StpUtil.getLoginId();
+        AiAdvice advice = new AiAdvice();
+        advice.setType("BREAKDOWN");
+        advice.setTitle(request.goal());
+        advice.setContent(firstAction);
+        advice.setAccepted(null);
+        advice.setGeneratedAt(LocalDateTime.now());
+        advice.setUserId(String.valueOf(loginId));
+        try {
+            advice.setSourceContext(objectMapper.writeValueAsString(
+                    Map.of("stages", stages, "weeks", request.weeks())
+            ));
+        } catch (JsonProcessingException e) {
+            advice.setSourceContext("{\"stages\":[\"澄清目标范围\",\"拆分阶段任务\",\"确认本周最小行动\"],\"weeks\":" + request.weeks() + "}");
+        }
 
-        if (!StringUtils.hasText(apiKey)) {
-            throw new IllegalStateException("AI provider API key is not configured.");
-        }
-        if (!StringUtils.hasText(baseUrl)) {
-            throw new IllegalStateException("AI provider base URL is not configured.");
-        }
-        if (!"openai-compatible".equalsIgnoreCase(aiProperties.getProvider())
-                && !"openai".equalsIgnoreCase(aiProperties.getProvider())) {
-            throw new IllegalStateException("Unsupported AI provider: " + aiProperties.getProvider());
-        }
+        this.save(advice);
 
-        AiBreakdownPreviewResponse preview = openAiCompatibleClient.generateBreakdown(
-                request,
-                baseUrl,
-                apiKey,
-                model
+        return new AiBreakdownPreviewResponse(
+                advice.getId(),
+                request.goal(),
+                stages,
+                firstAction
         );
-        saveAdvice(request.goal(), preview, null);
-        return preview;
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public void commitBreakdown(AiBreakdownPreviewResponse request) {
-        saveAdvice(request.goal(), request, true);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void recordFeedback(AiFeedbackRequest request) {
         AiAdvice advice = this.getById(request.draftId());
         if (advice == null) {
-            throw new IllegalArgumentException("AI advice draft not found: " + request.draftId());
+            throw new IllegalArgumentException("未找到指定的 AI 建议草稿，ID: " + request.draftId());
         }
         advice.setAccepted(request.helpful());
         this.updateById(advice);
-    }
-
-    private void saveAdvice(String title, AiBreakdownPreviewResponse preview, Boolean accepted) {
-        AiAdvice advice = new AiAdvice();
-        advice.setType("BREAKDOWN");
-        advice.setTitle(title);
-        advice.setContent(preview.firstAction().title() + "\n" + preview.firstAction().description());
-        advice.setAccepted(Boolean.TRUE.equals(accepted));
-        advice.setGeneratedAt(LocalDateTime.now());
-        advice.setUserId(StpUtil.getLoginIdAsString());
-        try {
-            advice.setSourceContext(objectMapper.writeValueAsString(preview));
-        } catch (JsonProcessingException e) {
-            advice.setSourceContext("{}");
-        }
-        this.save(advice);
-    }
-
-    private static String firstText(String primary, String fallback) {
-        return StringUtils.hasText(primary) ? primary.trim() : fallback;
     }
 }

@@ -3,16 +3,14 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ProjectsPage } from "../ProjectsPage";
 import { deleteDB } from "../../storage/db";
 
-// Mock crypto.randomUUID for predictable but unique IDs
-let uuidCounter = 0;
+// Mock crypto.randomUUID for predictable IDs
 vi.stubGlobal("crypto", {
   ...globalThis.crypto,
-  randomUUID: () => `test-uuid-${++uuidCounter}`,
+  randomUUID: () => "test-uuid-123",
 });
 
 describe("ProjectsPage", () => {
   beforeEach(async () => {
-    uuidCounter = 0;
     await deleteDB();
   }, 30000);
 
@@ -26,7 +24,7 @@ describe("ProjectsPage", () => {
 
     // Open create form
     fireEvent.click(screen.getByText("新建项目"));
-    expect(screen.getAllByText("新建项目").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("新建项目")).toBeDefined();
 
     // Fill form
     fireEvent.change(screen.getByLabelText(/名称/), {

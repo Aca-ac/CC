@@ -1,20 +1,12 @@
-name: Windows Desktop Release
+name: Windows Installer
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
-
-permissions:
-  contents: write
+  workflow_dispatch:
 
 jobs:
-  windows-release:
-    name: windows-release
+  windows-installer:
+    name: windows-installer
     runs-on: windows-latest
-    env:
-      VITE_APP_BASE: ./
-      VITE_API_BASE_URL: https://vincentt.xyz/chronos/api
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -28,32 +20,36 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Windows installer and portable app
+      - name: Build Windows installer
         run: npm run dist:win --workspace client
 
-      - name: Publish GitHub Release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $tag = "${{ github.ref_name }}"
-          $assets = Get-ChildItem -Path client/release -File |
-            Where-Object {
-              $_.Extension -in ".exe", ".blockmap", ".yml" -and $_.Name -ne "builder-debug.yml"
-            }
-          if (-not $assets) {
-            throw "No release assets found in client/release"
-          }
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: chronos-windows-installer
+          path: client/release/*.exe
+          if-no-files-found: error
 
-          $notes = @"
-          Chronos Windows desktop release.
+  backend-jar:
+    name: backend-jar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
 
-          This first Windows build is unsigned. Windows may show a SmartScreen warning until a code signing certificate is configured.
-          "@
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
 
-          gh release create $tag `
-            --repo "${{ github.repository }}" `
-            --title "Chronos $tag" `
-            --notes $notes `
-            --latest `
-            $assets.FullName
+      - name: Package server
+        run: ./server/mvnw -q -DskipTests package
+
+      - name: Upload server jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: chronos-server-jar
+          path: server/target/backend-0.0.1-SNAPSHOT.jar
+          if-no-files-found: error

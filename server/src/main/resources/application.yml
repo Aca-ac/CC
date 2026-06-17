@@ -35,9 +35,7 @@ mybatis-plus:
 
 chronos:
   ai:
-    provider: ${CHRONOS_AI_PROVIDER:openai-compatible}
-    base-url: ${CHRONOS_AI_BASE_URL:https://api.openai.com/v1}
-    model: ${CHRONOS_AI_MODEL:gpt-4o-mini}
+    provider: ${CHRONOS_AI_PROVIDER:mock}
     api-key: ${CHRONOS_AI_API_KEY:}
   security:
     jwt-secret: ${CHRONOS_JWT_SECRET:dev-only-change-me}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { focusSessionRepository } from "../storage/repositories/focusSessionRepository";
 import { timerStateRepository } from "../storage/repositories/timerStateRepository";
 import { outboxRepository } from "../storage/repositories/outboxRepository";
+import { apiClient } from "../services/apiClient";
 import { useAccountId } from "./useAccountId";
 import type { FocusSessionValue } from "../storage/db";
 
@@ -11,6 +12,10 @@ export interface TimerState {
   projectId?: string;
   taskId?: string;
   sessionId?: string;
+  /** true when restore from server is in progress */
+  restoring: boolean;
+  /** last operation error, cleared on next action */
+  error: string | null;
 }
 
 export interface UseTimerReturn {
@@ -19,6 +24,7 @@ export interface UseTimerReturn {
   stopTimer: () => Promise<void>;
   discardTimer: () => Promise<void>;
   restoreTimer: () => Promise<void>;
+  clearError: () => void;
 }
 
 export function useTimer(): UseTimerReturn {
@@ -26,6 +32,8 @@ export function useTimer(): UseTimerReturn {
   const [timer, setTimer] = useState<TimerState>({
     active: false,
     elapsedSeconds: 0,
+    restoring: false,
+    error: null,
   });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -68,15 +76,19 @@ export function useTimer(): UseTimerReturn {
 
   const startTimer = useCallback(
     async (projectId: string, taskId?: string) => {
+      setTimer((prev) => ({ ...prev, error: null }));
+
       // 每个账户只能有一个活跃计时器
       const existing = await focusSessionRepository.findActive(accountId);
       if (existing) {
-        throw new Error("已有一个活跃计时器，请先停止或丢弃当前计时器");
+        setTimer((prev) => ({ ...prev, error: "已有一个活跃计时器，请先停止或丢弃当前计时器" }));
+        return;
       }
 
       const now = Date.now();
+      const sessionId = crypto.randomUUID();
       const session: FocusSessionValue = {
-        id: crypto.randomUUID(),
+        id: sessionId,
         accountId,
         projectId,
         taskId,
@@ -87,6 +99,7 @@ export function useTimer(): UseTimerReturn {
         updatedAt: now,
       };
 
+      // 本地持久化（确保重启可恢复）
       await focusSessionRepository.create(session);
       await timerStateRepository.set({
         accountId,
@@ -99,6 +112,13 @@ export function useTimer(): UseTimerReturn {
       });
       await enqueue("CREATE", session.id, session);
 
+      // 尝试通知服务端（失败不阻塞本地）
+      try {
+        await apiClient.startTimer({ projectId, taskId });
+      } catch {
+        // 离线时进入 outbox，后续同步
+      }
+
       startTimeRef.current = now;
       setTimer({
         active: true,
@@ -106,6 +126,8 @@ export function useTimer(): UseTimerReturn {
         projectId,
         taskId,
         sessionId: session.id,
+        restoring: false,
+        error: null,
       });
       startTick();
     },
@@ -114,6 +136,7 @@ export function useTimer(): UseTimerReturn {
 
   const stopTimer = useCallback(async () => {
     if (!timer.active || !timer.sessionId) return;
+    setTimer((prev) => ({ ...prev, error: null }));
 
     const now = Date.now();
     const elapsedMinutes = Math.ceil(timer.elapsedSeconds / 60);
@@ -128,12 +151,20 @@ export function useTimer(): UseTimerReturn {
       durationMinutes: elapsedMinutes,
     });
 
+    // 尝试通知服务端
+    try {
+      await apiClient.stopTimer(timer.sessionId, { durationMinutes: elapsedMinutes });
+    } catch {
+      // 离线时进入 outbox
+    }
+
     clearTick();
-    setTimer({ active: false, elapsedSeconds: 0 });
+    setTimer({ active: false, elapsedSeconds: 0, restoring: false, error: null });
   }, [accountId, timer.active, timer.sessionId, timer.elapsedSeconds, enqueue, clearTick]);
 
   const discardTimer = useCallback(async () => {
     if (!timer.active || !timer.sessionId) return;
+    setTimer((prev) => ({ ...prev, error: null }));
 
     await focusSessionRepository.update(timer.sessionId, {
       discarded: true,
@@ -142,17 +173,79 @@ export function useTimer(): UseTimerReturn {
     await timerStateRepository.clear(accountId);
     await enqueue("UPDATE", timer.sessionId, { discarded: true });
 
+    try {
+      await apiClient.discardTimer(timer.sessionId);
+    } catch {
+      // 离线时进入 outbox
+    }
+
     clearTick();
-    setTimer({ active: false, elapsedSeconds: 0 });
+    setTimer({ active: false, elapsedSeconds: 0, restoring: false, error: null });
   }, [accountId, timer.active, timer.sessionId, enqueue, clearTick]);
 
   const restoreTimer = useCallback(async () => {
+    setTimer((prev) => ({ ...prev, restoring: true, error: null }));
+
+    try {
+      // 优先从服务端恢复
+      const serverActive = await apiClient.getActiveTimer();
+      if (serverActive) {
+        const serverStart = new Date(serverActive.startedAt).getTime();
+        const elapsed = Math.floor((Date.now() - serverStart) / 1000);
+
+        // 同步到本地
+        const existing = await focusSessionRepository.findById(serverActive.sessionId);
+        if (!existing) {
+          await focusSessionRepository.create({
+            id: serverActive.sessionId,
+            accountId,
+            projectId: serverActive.projectId,
+            taskId: serverActive.taskId,
+            startTime: serverStart,
+            durationMinutes: 0,
+            discarded: false,
+            createdAt: serverStart,
+            updatedAt: Date.now(),
+          });
+        }
+        await timerStateRepository.set({
+          accountId,
+          active: true,
+          sessionId: serverActive.sessionId,
+          projectId: serverActive.projectId,
+          taskId: serverActive.taskId,
+          startTime: serverStart,
+          updatedAt: Date.now(),
+        });
+
+        startTimeRef.current = serverStart;
+        setTimer({
+          active: true,
+          elapsedSeconds: elapsed,
+          projectId: serverActive.projectId,
+          taskId: serverActive.taskId,
+          sessionId: serverActive.sessionId,
+          restoring: false,
+          error: null,
+        });
+        startTick();
+        return;
+      }
+    } catch {
+      // 服务端不可用（离线/未部署），回退到本地恢复
+    }
+
+    // 回退：从本地 IndexedDB 恢复
     const state = await timerStateRepository.get(accountId);
-    if (!state || !state.active || !state.sessionId || !state.startTime) return;
+    if (!state || !state.active || !state.sessionId || !state.startTime) {
+      setTimer((prev) => ({ ...prev, restoring: false }));
+      return;
+    }
 
     const session = await focusSessionRepository.findById(state.sessionId);
     if (!session || session.endTime || session.discarded) {
       await timerStateRepository.clear(accountId);
+      setTimer((prev) => ({ ...prev, restoring: false }));
       return;
     }
 
@@ -164,9 +257,15 @@ export function useTimer(): UseTimerReturn {
       projectId: state.projectId,
       taskId: state.taskId,
       sessionId: state.sessionId,
+      restoring: false,
+      error: null,
     });
     startTick();
   }, [accountId, startTick]);
+
+  const clearError = useCallback(() => {
+    setTimer((prev) => ({ ...prev, error: null }));
+  }, []);
 
   // 应用重新打开时恢复活跃计时器
   useEffect(() => {
@@ -180,5 +279,6 @@ export function useTimer(): UseTimerReturn {
     stopTimer,
     discardTimer,
     restoreTimer,
+    clearError,
   };
 }

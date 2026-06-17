@@ -94,9 +94,9 @@ describe("useTimer", () => {
       await first.current.startTimer("project-1", "task-1");
     });
 
-    // 等待略超过 2 分钟，避免真实定时器和 Math.floor 的边界抖动。
+    // 等待 2 分钟
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 121000));
+      await new Promise((r) => setTimeout(r, 120000));
     });
 
     unmount();
