@@ -113,6 +113,13 @@ export const apiClient = {
   discardTimer: (sessionId: string) =>
     request<void>(`/timer/${sessionId}/discard`, { method: "POST" }),
 
+  getWeeklyStats: () => request<{
+    totalCompleted: number;
+    completionRate: number;
+    dailyMinutes: Array<{ date: string; minutes: number }>;
+    projectDistribution: Array<{ projectId: string; projectName: string; minutes: number }>;
+  }>("/stats/weekly"),
+
   syncPush: (records: SyncRecordItem[]) =>
     request<{ accepted: number; conflicts: Array<{ id: string; entityType: string; entityId: string; clientPayload: unknown; serverPayload: unknown }> }>("/sync/push", { method: "POST", body: JSON.stringify({ records }) }),
 

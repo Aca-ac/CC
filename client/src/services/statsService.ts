@@ -16,6 +16,6 @@ export interface WeeklyStatsDTO {
 
 export const statsService = {
   async getWeeklyStats(): Promise<WeeklyStatsDTO> {
-    return apiClient.get<WeeklyStatsDTO>("/api/stats/weekly");
+    return apiClient.getWeeklyStats();
   },
 };
