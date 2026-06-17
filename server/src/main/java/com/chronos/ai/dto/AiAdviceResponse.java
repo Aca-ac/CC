@@ -1,8 +1,14 @@
 package com.chronos.ai.dto;
 
+import java.util.List;
+
 public record AiAdviceResponse(
-        String type,
-        String title,
-        String content
+        List<AdviceItem> items
 ) {
+    public record AdviceItem(
+            String type,
+            String title,
+            String content
+    ) {
+    }
 }

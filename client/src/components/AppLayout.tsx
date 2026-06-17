@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
-import { Clock3, LogOut, User } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { LogOut, User } from "lucide-react";
+import { NavLink } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
 export interface NavigationItem {
@@ -14,17 +14,68 @@ interface AppLayoutProps {
   children: React.ReactNode;
 }
 
+function ChronosMark() {
+  return (
+    <svg
+      className="chronos-mark"
+      viewBox="0 0 128 128"
+      role="img"
+      aria-label="Chronos 应用图标"
+    >
+      <defs>
+        <linearGradient id="chronos-bg" x1="20" y1="16" x2="108" y2="116">
+          <stop stopColor="#0f3f38" />
+          <stop offset="1" stopColor="#071f2b" />
+        </linearGradient>
+        <linearGradient id="chronos-ring" x1="36" y1="30" x2="94" y2="96">
+          <stop stopColor="#a9f3d2" />
+          <stop offset="1" stopColor="#36c7c9" />
+        </linearGradient>
+      </defs>
+      <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#chronos-bg)" />
+      <path
+        d="M32 90c10 14 27 21 44 17 21-5 36-24 33-46"
+        fill="none"
+        stroke="#234d43"
+        strokeWidth="14"
+        strokeLinecap="round"
+      />
+      <circle cx="64" cy="63" r="33" fill="#102f2c" stroke="url(#chronos-ring)" strokeWidth="7" />
+      <path
+        d="M64 42v22l16 10"
+        fill="none"
+        stroke="#effcf5"
+        strokeWidth="7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M42 88l8 8 17-22"
+        fill="none"
+        stroke="#f0bb67"
+        strokeWidth="8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="92" cy="34" r="7" fill="#f0bb67" />
+    </svg>
+  );
+}
+
 export function AppLayout({ navigation, children }: AppLayoutProps) {
-  const location = useLocation();
   const { session, offline, logout } = useAuth();
-  const current = navigation.find((item) => item.path === location.pathname);
+  const today = new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  }).format(new Date());
 
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="主导航">
         <div className="brand">
-          <div className="brand-mark" aria-hidden="true">
-            <Clock3 size={22} />
+          <div className="brand-mark">
+            <ChronosMark />
           </div>
           <div>
             <strong>Chronos</strong>
@@ -44,6 +95,11 @@ export function AppLayout({ navigation, children }: AppLayoutProps) {
           })}
         </nav>
 
+        <div className="sidebar-status" aria-label="今日状态">
+          <span>{today}</span>
+          <strong>{offline ? "离线模式" : "本地优先 · AI 可选"}</strong>
+        </div>
+
         {session && (
           <div className="user-bar">
             <div className="user-info">
@@ -59,15 +115,6 @@ export function AppLayout({ navigation, children }: AppLayoutProps) {
       </aside>
 
       <main className="main-panel">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Chronos Scaffold</p>
-            <h1>{current?.label ?? "今日看板"}</h1>
-          </div>
-          <span className="sync-pill">
-            {offline ? "离线模式" : "本地优先 · AI 可选"}
-          </span>
-        </header>
         {children}
       </main>
     </div>

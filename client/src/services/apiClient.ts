@@ -120,6 +120,10 @@ export const apiClient = {
     projectDistribution: Array<{ projectId: string; projectName: string; minutes: number }>;
   }>("/stats/weekly"),
 
+  getAiAdvice: () => request<{
+    items: Array<{ type: string; title: string; content: string }>;
+  }>("/ai/advice"),
+
   syncPush: (records: SyncRecordItem[]) =>
     request<{ accepted: number; conflicts: Array<{ id: string; entityType: string; entityId: string; clientPayload: unknown; serverPayload: unknown }> }>("/sync/push", { method: "POST", body: JSON.stringify({ records }) }),
 

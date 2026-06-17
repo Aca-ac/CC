@@ -1,8 +1,11 @@
+import { Sparkles } from "lucide-react";
 import { useDashboard } from "../hooks/useDashboard";
+import { useAiAdvice } from "../hooks/useAiAdvice";
 import { PriorityBadge, StatusBadge } from "../components/StatusBadge";
 
 export function DashboardPage() {
   const { summary, todayTasks, loading, error, online, refresh } = useDashboard();
+  const { advice, loading: adviceLoading, error: adviceError } = useAiAdvice();
 
   return (
     <section className="page-stack">
@@ -14,11 +17,7 @@ export function DashboardPage() {
               离线模式
             </span>
           )}
-          <button
-            className="btn-secondary"
-            onClick={refresh}
-            disabled={loading}
-          >
+          <button className="btn-secondary" onClick={refresh} disabled={loading}>
             刷新
           </button>
         </div>
@@ -68,9 +67,7 @@ export function DashboardPage() {
                     <article className="task-row" key={task.id}>
                       <div>
                         <h3>{task.title}</h3>
-                        <p>
-                          {task.description ?? "后续补充任务详情和子任务入口。"}
-                        </p>
+                        <p>{task.description ?? "后续补充任务详情和子任务入口。"}</p>
                       </div>
                       <div className="row-actions">
                         <PriorityBadge priority={task.priority} />
@@ -84,23 +81,39 @@ export function DashboardPage() {
 
             <section className="panel">
               <div className="panel-heading">
-                <h2>同步与建议</h2>
-                <p>本地数据可离线使用，AI 输出会先进入草稿预览。</p>
+                <h2>
+                  <Sparkles size={16} style={{ verticalAlign: "middle", marginRight: 6 }} />
+                  AI 每周建议
+                </h2>
+                <p>基于你的学习记录和任务完成情况生成的个性化建议。</p>
               </div>
-              <div className="compact-list">
-                <div className="compact-item">
-                  <span>待同步变更</span>
-                  <strong>{summary.syncPendingTotal}</strong>
+
+              {adviceLoading && (
+                <div className="state-message">AI 建议加载中…</div>
+              )}
+
+              {adviceError && (
+                <div className="state-message state-failure" role="alert">
+                  AI 建议加载失败：{adviceError}
                 </div>
-                <div className="compact-item">
-                  <span>连续打卡</span>
-                  <strong>{summary.habitStreak} 天</strong>
+              )}
+
+              {!adviceLoading && !adviceError && advice.length === 0 && (
+                <div className="state-message state-empty">
+                  暂无建议，开始学习后 AI 将为你生成个性化建议。
                 </div>
-                <div className="compact-item">
-                  <span>AI 工作流</span>
-                  <strong>草稿确认</strong>
+              )}
+
+              {!adviceLoading && advice.length > 0 && (
+                <div className="compact-list">
+                  {advice.map((item, i) => (
+                    <div key={i} className="compact-item" style={{ alignItems: "flex-start", flexDirection: "column", gap: 4 }}>
+                      <strong style={{ fontSize: "0.9rem" }}>{item.title}</strong>
+                      <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>{item.content}</span>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
             </section>
           </div>
         </>

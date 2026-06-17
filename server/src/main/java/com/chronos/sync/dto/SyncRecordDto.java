@@ -1,11 +1,12 @@
 package com.chronos.sync.dto;
 
+import java.util.Map;
+
 public record SyncRecordDto(
         String entityType,
         String entityId,
         String changeType,
         long version,
-        String payload
+        Map<String, Object> payload
 ) {
 }
-
