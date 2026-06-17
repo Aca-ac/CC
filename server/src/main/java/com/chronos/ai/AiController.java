@@ -37,11 +37,8 @@ public class AiController {
 
     @PostMapping("/breakdown/preview")
     public ApiResponse<BreakdownTreeResponse> breakdownTreePreview(
-            @RequestBody Map<String, Object> body) {
-        String goal = (String) body.getOrDefault("goal", "");
-        int weeks = body.containsKey("weeks") ? ((Number) body.get("weeks")).intValue() : 4;
-        String projectId = (String) body.get("projectId");
-        return ApiResponse.ok(aiService.previewBreakdownTree(goal, weeks, projectId));
+            @Valid @RequestBody BreakdownTreePreviewRequest request) {
+        return ApiResponse.ok(aiService.previewBreakdownTree(request.goal(), request.weeks(), request.projectId()));
     }
 
     @PostMapping("/breakdown/commit")

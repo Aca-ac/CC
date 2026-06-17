@@ -18,6 +18,7 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
@@ -205,14 +206,15 @@ public class AiSettingsService {
 
     /**
      * 从配置的 master key 派生 256-bit AES 密钥。
-     * 简单处理：取 SHA-256 的低位或补齐/截断到 32 字节。
+     * 使用 SHA-256 对 UTF-8 编码的 master key 进行哈希，得到固定 32 字节密钥。
      */
     private byte[] deriveKey(String key) {
-        byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
-        byte[] result = new byte[32]; // AES-256
-        int len = Math.min(keyBytes.length, 32);
-        System.arraycopy(keyBytes, 0, result, 0, len);
-        return result;
+        try {
+            return MessageDigest.getInstance("SHA-256")
+                    .digest(key.getBytes(StandardCharsets.UTF_8));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 algorithm not available", e);
+        }
     }
 
     /**

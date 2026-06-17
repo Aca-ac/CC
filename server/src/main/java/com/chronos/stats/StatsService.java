@@ -24,15 +24,18 @@ public class StatsService {
     private final HabitCheckinMapper habitCheckinMapper;
     private final LearningLogMapper learningLogMapper;
     private final ProjectMapper projectMapper;
+    private final com.chronos.mapper.HabitMapper habitMapper;
 
     public StatsService(TaskMapper taskMapper, FocusSessionMapper focusSessionMapper,
                         HabitCheckinMapper habitCheckinMapper, LearningLogMapper learningLogMapper,
-                        ProjectMapper projectMapper) {
+                        ProjectMapper projectMapper,
+                        com.chronos.mapper.HabitMapper habitMapper) {
         this.taskMapper = taskMapper;
         this.focusSessionMapper = focusSessionMapper;
         this.habitCheckinMapper = habitCheckinMapper;
         this.learningLogMapper = learningLogMapper;
         this.projectMapper = projectMapper;
+        this.habitMapper = habitMapper;
     }
 
     public WeeklyStatsResponse getWeeklyStats(LocalDate weekStartParam) {
@@ -47,6 +50,11 @@ public class StatsService {
 
         LocalDateTime weekStartDateTime = weekStart.atStartOfDay();
         LocalDateTime weekEndDateTime = weekEnd.atTime(LocalTime.MAX);
+
+        // 获取当前用户的所有习惯ID（用于打卡统计的用户隔离）
+        List<String> userHabitIds = habitMapper.selectList(
+                new LambdaQueryWrapper<Habit>().eq(Habit::getUserId, userId)
+        ).stream().map(Habit::getId).collect(Collectors.toList());
 
         // 获取当前用户的所有项目ID
         List<String> projectIds = projectMapper.selectList(
@@ -129,10 +137,14 @@ public class StatsService {
         }
 
         // --- 习惯打卡次数 ---
-        int habitCheckins = habitCheckinMapper.selectCount(
-                new LambdaQueryWrapper<HabitCheckin>()
-                        .between(HabitCheckin::getCheckedAt, weekStartDateTime, weekEndDateTime)
-        ).intValue();
+        int habitCheckins = 0;
+        if (!userHabitIds.isEmpty()) {
+            habitCheckins = habitCheckinMapper.selectCount(
+                    new LambdaQueryWrapper<HabitCheckin>()
+                            .in(HabitCheckin::getHabitId, userHabitIds)
+                            .between(HabitCheckin::getCheckedAt, weekStartDateTime, weekEndDateTime)
+            ).intValue();
+        }
 
         // --- 学习日志数 ---
         int learningLogs = 0;
@@ -207,10 +219,15 @@ public class StatsService {
                         .sum();
             }
 
-            dayCheckins = habitCheckinMapper.selectCount(
-                    new LambdaQueryWrapper<HabitCheckin>()
-                            .between(HabitCheckin::getCheckedAt, dayStart, dayEnd)
-            ).intValue();
+            if (!userHabitIds.isEmpty()) {
+                dayCheckins = habitCheckinMapper.selectCount(
+                        new LambdaQueryWrapper<HabitCheckin>()
+                                .in(HabitCheckin::getHabitId, userHabitIds)
+                                .between(HabitCheckin::getCheckedAt, dayStart, dayEnd)
+                ).intValue();
+            } else {
+                dayCheckins = 0;
+            }
 
             dailyStats.add(new WeeklyStatsResponse.DailyStats(
                     date.format(dateFormatter),

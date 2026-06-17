@@ -14,7 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -78,14 +80,31 @@ public class SyncService extends ServiceImpl<SyncRecordMapper, SyncRecord> {
                 .orderByDesc(SyncRecord::getLastModifiedAt)
         );
 
+        com.fasterxml.jackson.databind.ObjectMapper objectMapper =
+                new com.fasterxml.jackson.databind.ObjectMapper();
+
         List<SyncRecordDto> records = pendingRecords.stream()
-            .map(record -> new SyncRecordDto(
-                record.getEntityType(),
-                record.getEntityId(),
-                record.getChangeType(),
-                record.getVersion() != null ? record.getVersion() : 0L,
-                null
-            ))
+            .map(record -> {
+                Map<String, Object> payload = null;
+                String rawPayload = record.getPayload();
+                if (rawPayload != null && !rawPayload.isBlank()) {
+                    try {
+                        payload = objectMapper.readValue(rawPayload,
+                                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+                    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                        payload = Collections.emptyMap();
+                    }
+                } else {
+                    payload = Collections.emptyMap();
+                }
+                return new SyncRecordDto(
+                    record.getEntityType(),
+                    record.getEntityId(),
+                    record.getChangeType(),
+                    record.getVersion() != null ? record.getVersion() : 0L,
+                    payload
+                );
+            })
             .collect(Collectors.toList());
 
         String nextCursor = "sync-cursor-" + System.currentTimeMillis();
