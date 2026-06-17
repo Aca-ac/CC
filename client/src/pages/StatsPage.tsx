@@ -101,7 +101,7 @@ function PieChart({
 export function StatsPage() {
   const { stats, loading, error, cached, refresh } = useStats();
 
-  const hasData = stats && stats.totalCompleted > 0;
+  const hasData = stats && (stats.totalCompleted > 0 || stats.dailyMinutes.some((d) => d.minutes > 0));
 
   return (
     <section className="page-stack">
@@ -116,11 +116,7 @@ export function StatsPage() {
               离线缓存
             </span>
           )}
-          <button
-            className="btn-secondary"
-            onClick={refresh}
-            disabled={loading}
-          >
+          <button className="btn-secondary" onClick={refresh} disabled={loading}>
             刷新
           </button>
         </div>
