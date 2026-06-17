@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, Bot, Save, Server, Trash2 } from "lucide-react";
+import { Activity, Bot, ExternalLink, RefreshCw, Save, Server, Trash2 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { apiClient } from "../services/apiClient";
 import {
@@ -9,6 +9,12 @@ import {
   saveAiSettings,
   type AiSettings,
 } from "../services/aiService";
+import {
+  CURRENT_APP_VERSION,
+  checkForUpdates,
+  openReleasePage,
+  type UpdateCheckResult,
+} from "../services/updateService";
 
 export function SettingsPage() {
   const { apiBaseUrl, setApiBaseUrl, offline } = useAuth();
@@ -18,6 +24,9 @@ export function SettingsPage() {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [aiSettings, setAiSettings] = useState<AiSettings>(() => loadAiSettings());
   const [keyInput, setKeyInput] = useState("");
+  const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const flash = (message: string) => {
     setSaveMsg(message);
@@ -68,6 +77,23 @@ export function SettingsPage() {
     flash("Local AI key cleared.");
   };
 
+  const handleCheckUpdates = async () => {
+    setUpdateLoading(true);
+    setUpdateError(null);
+    try {
+      const result = await checkForUpdates();
+      setUpdateResult(result);
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : "Update check failed.");
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const handleOpenRelease = async () => {
+    await openReleasePage(updateResult?.releaseUrl ?? "https://github.com/Vincent-Ctrl-18/Chronos/releases");
+  };
+
   const aiUsesCustom = aiSettings.mode === "custom";
   const publicHttpWarning = aiUsesCustom && isPublicHttp(aiSettings.baseUrl);
 
@@ -108,6 +134,44 @@ export function SettingsPage() {
         {healthStatus && (
           <div className="auth-error" style={{ marginTop: 12 }}>
             {healthStatus}
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading">
+          <h2>App Updates</h2>
+          <p>
+            Check the latest GitHub release from inside Chronos. This lightweight flow opens the release page when
+            an installer is available.
+          </p>
+        </div>
+        <div className="update-card">
+          <div>
+            <span>Current version</span>
+            <strong>v{CURRENT_APP_VERSION}</strong>
+          </div>
+          <div className="update-actions">
+            <button className="btn-secondary" onClick={handleCheckUpdates} disabled={updateLoading}>
+              <RefreshCw size={14} />
+              {updateLoading ? "Checking..." : "Check updates"}
+            </button>
+            {(updateResult?.status === "available" || updateResult?.status === "unavailable") && (
+              <button className="btn-primary" onClick={handleOpenRelease}>
+                <ExternalLink size={14} />
+                Open releases
+              </button>
+            )}
+          </div>
+        </div>
+        {updateResult && (
+          <div className={`update-message ${updateResult.status === "available" ? "update-message-new" : ""}`}>
+            {updateResult.message}
+          </div>
+        )}
+        {updateError && (
+          <div className="auth-error" style={{ marginTop: 12 }}>
+            {updateError}
           </div>
         )}
       </section>
