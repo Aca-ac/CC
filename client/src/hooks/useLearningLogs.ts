@@ -4,7 +4,16 @@ import { focusSessionRepository } from "../storage/repositories/focusSessionRepo
 import { outboxRepository } from "../storage/repositories/outboxRepository";
 import type { LearningLogValue, FocusSessionValue } from "../storage/db";
 
-const ACCOUNT_ID = "local"; // TODO: 从 auth context 获取真实 accountId
+function getAccountId(): string {
+  try {
+    const raw = localStorage.getItem("chronos:session");
+    if (raw) {
+      const session = JSON.parse(raw) as { userId: string };
+      if (session.userId) return session.userId;
+    }
+  } catch { /* ignore */ }
+  return "local";
+}
 
 export interface UnifiedLog {
   id: string;
@@ -62,9 +71,10 @@ export function useLearningLogs(): UseLearningLogsReturn {
   const [error, setError] = useState<string | null>(null);
 
   const loadLocal = useCallback(async () => {
+    const accountId = getAccountId();
     const [manualLogs, sessions] = await Promise.all([
-      learningLogRepository.findAll(ACCOUNT_ID),
-      focusSessionRepository.findNonDiscarded(ACCOUNT_ID),
+      learningLogRepository.findAll(accountId),
+      focusSessionRepository.findNonDiscarded(accountId),
     ]);
 
     const unified: UnifiedLog[] = [
@@ -90,9 +100,10 @@ export function useLearningLogs(): UseLearningLogsReturn {
 
   const enqueue = useCallback(
     async (operation: "CREATE" | "UPDATE" | "DELETE", entityId: string, payload: unknown) => {
+      const accountId = getAccountId();
       await outboxRepository.create({
         mutationId: crypto.randomUUID(),
-        accountId: ACCOUNT_ID,
+        accountId,
         operation,
         entityType: "LOG",
         entityId,
@@ -114,7 +125,7 @@ export function useLearningLogs(): UseLearningLogsReturn {
       const log: LearningLogValue = {
         ...data,
         id: crypto.randomUUID(),
-        accountId: ACCOUNT_ID,
+        accountId: getAccountId(),
         createdAt: now,
         updatedAt: now,
         deleted: false,

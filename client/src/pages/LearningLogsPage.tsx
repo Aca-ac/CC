@@ -3,6 +3,7 @@ import { useLearningLogs } from "../hooks/useLearningLogs";
 import { useTimer } from "../hooks/useTimer";
 import { useProjects } from "../hooks/useProjects";
 import { useTasks } from "../hooks/useTasks";
+import { useAuth } from "../hooks/useAuth";
 import type { LearningLogValue } from "../storage/db";
 
 function formatDuration(seconds: number): string {
@@ -18,9 +19,10 @@ function formatDate(ts: number): string {
 
 export function LearningLogsPage() {
   const { logs, loading, error, createManualLog, refresh } = useLearningLogs();
-  const { timer, startTimer, stopTimer, discardTimer } = useTimer();
+  const { timer, startTimer, stopTimer, discardTimer, clearError } = useTimer();
   const { projects } = useProjects();
   const { tasks } = useTasks();
+  const { offline } = useAuth();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState<
@@ -78,7 +80,7 @@ export function LearningLogsPage() {
     try {
       await startTimer(timerProjectId, timerTaskId || undefined);
     } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
+      // error is already set in timer state
     }
   };
 
@@ -88,10 +90,23 @@ export function LearningLogsPage() {
       <section className="panel">
         <div className="panel-heading">
           <h2>专注计时器</h2>
-          <p>每个账户同时只能运行一个计时器。</p>
+          <p>每个账户同时只能运行一个计时器。重启后自动恢复。</p>
         </div>
 
-        {timer.active ? (
+        {timer.restoring && (
+          <div className="state-message">正在恢复计时器…</div>
+        )}
+
+        {timer.error && (
+          <div className="state-message state-failure" role="alert">
+            {timer.error}
+            <button className="btn-secondary" onClick={clearError} style={{ marginLeft: 8 }}>
+              关闭
+            </button>
+          </div>
+        )}
+
+        {!timer.restoring && timer.active ? (
           <div className="timer-active">
             <div className="timer-display">{formatDuration(timer.elapsedSeconds)}</div>
             <div className="timer-info">
@@ -108,12 +123,12 @@ export function LearningLogsPage() {
               <button className="btn-primary" onClick={stopTimer}>
                 停止并保存
               </button>
-              <button className="btn-danger" onClick={discardTimer}>
+              <button className="btn-secondary" onClick={discardTimer}>
                 丢弃
               </button>
             </div>
           </div>
-        ) : (
+        ) : !timer.restoring ? (
           <div className="timer-setup">
             <label>
               选择项目
@@ -152,15 +167,20 @@ export function LearningLogsPage() {
             >
               开始计时
             </button>
+            {offline && (
+              <span className="offline-badge" style={{ marginTop: 8 }}>
+                离线模式：计时数据将保存到本地
+              </span>
+            )}
           </div>
-        )}
+        ) : null}
       </section>
 
       {/* 手动日志表单 */}
       <section className="panel">
         <div className="panel-heading">
           <h2>学习日志</h2>
-          <div className="panel-actions">
+          <div className="row-actions">
             <button className="btn-primary" onClick={() => setIsFormOpen(true)}>
               手动录入
             </button>

@@ -805,3 +805,291 @@ th {
   background: var(--panel-muted);
 }
 
+/* ── State Messages ─────────────────────────────────────────── */
+
+.state-message {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-muted);
+  padding: var(--space-md) var(--space-lg);
+  font-size: 0.9rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.state-message.state-failure {
+  background: oklch(95% 0.03 30 / 0.15);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.state-message.state-empty {
+  background: transparent;
+  border-style: dashed;
+}
+
+/* ── Timer ─────────────────────────────────────────────────── */
+
+.timer-active {
+  display: grid;
+  gap: var(--space-lg);
+  place-items: center;
+  padding: var(--space-xl);
+}
+
+.timer-display {
+  font-size: 3.2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.timer-info {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.timer-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.timer-setup {
+  display: grid;
+  gap: var(--space-lg);
+  max-width: 400px;
+}
+
+.timer-setup label {
+  display: grid;
+  gap: var(--space-sm);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.timer-setup select,
+.timer-setup input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  padding: var(--space-md);
+}
+
+/* ── Modal ──────────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  background: oklch(15% 0.02 82 / 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  width: min(520px, 92vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  display: grid;
+  gap: var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) + 4px);
+  background: var(--panel);
+  padding: var(--space-2xl);
+  box-shadow: 0 8px 32px oklch(15% 0.02 82 / 0.18);
+}
+
+.modal h3 {
+  margin: 0;
+}
+
+/* ── Form Stack ─────────────────────────────────────────────── */
+
+.form-stack {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.form-stack label {
+  display: grid;
+  gap: var(--space-sm);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.form-stack select,
+.form-stack input,
+.form-stack textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  padding: var(--space-md);
+}
+
+.form-error {
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  background: oklch(95% 0.03 30 / 0.15);
+  color: var(--danger);
+  padding: var(--space-md) var(--space-lg);
+  font-size: 0.85rem;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+/* ── Day Cell (Calendar) ────────────────────────────────────── */
+
+.day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
+.day-date {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.day-tasks {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.day-empty {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.day-task-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--panel-muted);
+  font-size: 0.82rem;
+}
+
+.day-task-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+  padding: var(--space-md) var(--space-lg);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: oklch(99% 0.006 165);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: oklch(48% 0.14 165);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--panel-muted);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: oklch(99% 0.006 30);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: oklch(55% 0.18 30);
+}
+
+/* ── Panel Actions ──────────────────────────────────────────── */
+
+.panel-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+/* ── Input with Toggle ──────────────────────────────────────── */
+
+.input-with-toggle {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.input-with-toggle input {
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  padding: var(--space-md);
+}
+
+.key-mask {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: var(--space-xs);
+}
+
+.save-hint {
+  font-size: 0.82rem;
+  color: var(--accent);
+  margin-left: var(--space-sm);
+}
+
+/* ── Settings Checkbox Row ─────────────────────────────────── */
+
+.checkbox-row {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+

@@ -5,7 +5,16 @@ import { apiClient } from "../services/apiClient";
 import type { TaskValue } from "../storage/db";
 import type { Task, TaskStatus } from "../types/domain";
 
-const ACCOUNT_ID = "local"; // TODO: 从 auth context 获取真实 accountId
+function getAccountId(): string {
+  try {
+    const raw = localStorage.getItem("chronos:session");
+    if (raw) {
+      const session = JSON.parse(raw) as { userId: string };
+      if (session.userId) return session.userId;
+    }
+  } catch { /* ignore */ }
+  return "local";
+}
 
 function toDomain(t: TaskValue): Task {
   return {
@@ -44,7 +53,7 @@ export function useTasks(): UseTasksReturn {
   const [online, setOnline] = useState(navigator.onLine);
 
   const loadLocal = useCallback(async () => {
-    const list = await taskRepository.findAll(ACCOUNT_ID);
+    const list = await taskRepository.findAll(getAccountId());
     setTasks(list.filter((t) => !t.deleted).map(toDomain));
   }, []);
 
@@ -58,7 +67,7 @@ export function useTasks(): UseTasksReturn {
           const existing = await taskRepository.findById(r.id);
           const value: TaskValue = {
             ...r,
-            accountId: ACCOUNT_ID,
+            accountId: getAccountId(),
             actualMinutes: existing?.actualMinutes ?? 0,
             createdAt: existing?.createdAt ?? Date.now(),
             updatedAt: Date.now(),
@@ -83,7 +92,7 @@ export function useTasks(): UseTasksReturn {
     async (operation: "CREATE" | "UPDATE" | "DELETE", entityId: string, payload: unknown) => {
       await outboxRepository.create({
         mutationId: crypto.randomUUID(),
-        accountId: ACCOUNT_ID,
+        accountId: getAccountId(),
         operation,
         entityType: "TASK",
         entityId,
@@ -106,7 +115,7 @@ export function useTasks(): UseTasksReturn {
       const task: TaskValue = {
         ...data,
         id: crypto.randomUUID(),
-        accountId: ACCOUNT_ID,
+        accountId: getAccountId(),
         projectId,
         actualMinutes: 0,
         createdAt: now,

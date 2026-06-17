@@ -4,7 +4,16 @@ import { apiClient } from "../services/apiClient";
 import type { DashboardSummary, Task } from "../types/domain";
 import type { TaskValue } from "../storage/db";
 
-const ACCOUNT_ID = "local"; // TODO: 从 auth context 获取真实 accountId
+function getAccountId(): string {
+  try {
+    const raw = localStorage.getItem("chronos:session");
+    if (raw) {
+      const session = JSON.parse(raw) as { userId: string };
+      if (session.userId) return session.userId;
+    }
+  } catch { /* ignore */ }
+  return "local";
+}
 
 function toDomain(t: TaskValue): Task {
   return {
@@ -64,7 +73,7 @@ export function useDashboard(): UseDashboardReturn {
   const [online, setOnline] = useState(navigator.onLine);
 
   const loadLocal = useCallback(async () => {
-    const allTasks = await taskRepository.findAll(ACCOUNT_ID);
+    const allTasks = await taskRepository.findAll(getAccountId());
     const activeTasks = allTasks.filter((t) => !t.deleted);
     setSummary(computeSummary(activeTasks));
 
@@ -87,7 +96,7 @@ export function useDashboard(): UseDashboardReturn {
           const existing = await taskRepository.findById(r.id);
           const value: TaskValue = {
             ...r,
-            accountId: ACCOUNT_ID,
+            accountId: getAccountId(),
             actualMinutes: existing?.actualMinutes ?? 0,
             createdAt: existing?.createdAt ?? Date.now(),
             updatedAt: Date.now(),

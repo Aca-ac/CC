@@ -19,11 +19,27 @@ export interface RegisterRequest {
 }
 
 export interface SyncRecordItem {
-  entityType: "PROJECT" | "TASK" | "LOG";
+  entityType: "PROJECT" | "TASK" | "LOG" | "FOCUS";
   entityId: string;
   changeType: "CREATE" | "UPDATE" | "DELETE";
   version: number;
   payload: Record<string, unknown>;
+}
+
+export interface ActiveTimerResponse {
+  sessionId: string;
+  projectId: string;
+  taskId?: string;
+  startedAt: string;
+}
+
+export interface TimerStartRequest {
+  projectId: string;
+  taskId?: string;
+}
+
+export interface TimerStopRequest {
+  durationMinutes: number;
 }
 
 const API_URL_KEY = "chronos:apiUrl";
@@ -85,6 +101,15 @@ export const apiClient = {
   // TODO(前后端联调): AI 接口必须返回草稿结构，前端确认前不能直接创建正式任务。
   previewAiBreakdown: (payload: { goal: string; weeks: number }) =>
     request<unknown>("/ai/breakdown-preview", { method: "POST", body: JSON.stringify(payload) }),
+
+  // ── Timer ────────────────────────────────────────────────────
+  getActiveTimer: () => request<ActiveTimerResponse | null>("/timer/active"),
+  startTimer: (payload: TimerStartRequest) =>
+    request<{ sessionId: string }>("/timer/start", { method: "POST", body: JSON.stringify(payload) }),
+  stopTimer: (sessionId: string, payload: TimerStopRequest) =>
+    request<void>(`/timer/${sessionId}/stop`, { method: "POST", body: JSON.stringify(payload) }),
+  discardTimer: (sessionId: string) =>
+    request<void>(`/timer/${sessionId}/discard`, { method: "POST" }),
 
   syncPush: (records: SyncRecordItem[]) =>
     request<{ accepted: number; conflicts: Array<{ id: string; entityType: string; entityId: string; clientPayload: unknown; serverPayload: unknown }> }>("/sync/push", { method: "POST", body: JSON.stringify({ records }) }),

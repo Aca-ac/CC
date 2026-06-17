@@ -5,7 +5,16 @@ import { apiClient } from "../services/apiClient";
 import type { ProjectValue } from "../storage/db";
 import type { Project } from "../types/domain";
 
-const ACCOUNT_ID = "local"; // TODO: 从 auth context 获取真实 accountId
+function getAccountId(): string {
+  try {
+    const raw = localStorage.getItem("chronos:session");
+    if (raw) {
+      const session = JSON.parse(raw) as { userId: string };
+      if (session.userId) return session.userId;
+    }
+  } catch { /* ignore */ }
+  return "local";
+}
 
 function toDomain(p: ProjectValue): Project {
   return {
@@ -37,7 +46,7 @@ export function useProjects(): UseProjectsReturn {
   const [online, setOnline] = useState(navigator.onLine);
 
   const loadLocal = useCallback(async () => {
-    const list = await projectRepository.findAll(ACCOUNT_ID);
+    const list = await projectRepository.findAll(getAccountId());
     setProjects(list.filter((p) => !p.deleted).map(toDomain));
   }, []);
 
@@ -52,7 +61,7 @@ export function useProjects(): UseProjectsReturn {
           const existing = await projectRepository.findById(r.id);
           const value: ProjectValue = {
             ...r,
-            accountId: ACCOUNT_ID,
+            accountId: getAccountId(),
             createdAt: existing?.createdAt ?? Date.now(),
             updatedAt: Date.now(),
             deleted: false,
@@ -76,7 +85,7 @@ export function useProjects(): UseProjectsReturn {
     async (operation: "CREATE" | "UPDATE" | "DELETE", entityId: string, payload: unknown) => {
       await outboxRepository.create({
         mutationId: crypto.randomUUID(),
-        accountId: ACCOUNT_ID,
+        accountId: getAccountId(),
         operation,
         entityType: "PROJECT",
         entityId,
@@ -96,7 +105,7 @@ export function useProjects(): UseProjectsReturn {
       const project: ProjectValue = {
         ...data,
         id: crypto.randomUUID(),
-        accountId: ACCOUNT_ID,
+        accountId: getAccountId(),
         createdAt: now,
         updatedAt: now,
         deleted: false,
