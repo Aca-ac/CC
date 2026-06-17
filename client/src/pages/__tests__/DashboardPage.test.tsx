@@ -12,15 +12,16 @@ describe("DashboardPage", () => {
   it("renders empty dashboard with zero metrics", async () => {
     render(<DashboardPage />);
 
+    let cards: HTMLElement[] = [];
     await waitFor(() => {
-      expect(screen.getByText("今日看板")).toBeDefined();
+      cards = screen.getAllByRole("article");
+      expect(cards.length).toBe(4);
     });
 
     // Check metrics are 0
-    const cards = screen.getAllByRole("article");
     expect(cards.length).toBe(4);
 
-    expect(screen.getByText("0")).toBeDefined();
+    expect(screen.getAllByText("0").length).toBeGreaterThanOrEqual(4);
   });
 
   it("reflects local task changes immediately", async () => {
@@ -45,7 +46,7 @@ describe("DashboardPage", () => {
     render(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("今日任务")).toBeDefined();
+      expect(screen.getAllByText("今日任务").length).toBeGreaterThan(0);
     });
 
     expect(screen.getByText("1")).toBeDefined(); // todayTaskTotal

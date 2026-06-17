@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS ai_advices (
 
 CREATE TABLE IF NOT EXISTS sync_records (
     id VARCHAR(64) PRIMARY KEY COMMENT '同步记录 ID',
+    user_id VARCHAR(64) NOT NULL DEFAULT 'legacy' COMMENT '所属用户 ID',
     entity_type VARCHAR(40) NOT NULL COMMENT '实体类型，如 PROJECT/TASK/LOG',
     entity_id VARCHAR(64) NOT NULL COMMENT '实体 ID',
     change_type VARCHAR(20) NOT NULL COMMENT '变更类型：CREATE/UPDATE/DELETE',
@@ -127,4 +128,4 @@ CREATE INDEX idx_tasks_project_status ON tasks(project_id, status);
 CREATE INDEX idx_tasks_due_time ON tasks(due_time);
 CREATE INDEX idx_learning_logs_task_id ON learning_logs(task_id);
 CREATE INDEX idx_sync_records_status ON sync_records(sync_status, last_modified_at);
-
+CREATE INDEX idx_sync_records_user_cursor ON sync_records(user_id, version, id);

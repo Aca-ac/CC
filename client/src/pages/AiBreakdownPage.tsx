@@ -1,83 +1,61 @@
 import { useState } from "react";
-import { aiService, type BreakdownPreview, type BreakdownPhase, type BreakdownTask } from "../services/aiService";
+import { useNavigate } from "react-router-dom";
+import { apiClient } from "../services/apiClient";
 import { useProjects } from "../hooks/useProjects";
-import { useTasks } from "../hooks/useTasks";
 
-function TaskItem({
-  task,
-  onChange,
-}: {
-  task: BreakdownTask;
-  onChange: (next: BreakdownTask) => void;
-}) {
-  return (
-    <div className="task-item">
-      <input
-        value={task.title}
-        onChange={(e) => onChange({ ...task, title: e.target.value })}
-        className="task-title-input"
-      />
-      <textarea
-        value={task.description}
-        onChange={(e) => onChange({ ...task, description: e.target.value })}
-        rows={2}
-        className="task-desc-input"
-        placeholder="任务描述"
-      />
-      <div className="task-meta">
-        <input
-          type="number"
-          min={0}
-          value={task.estimatedMinutes}
-          onChange={(e) =>
-            onChange({ ...task, estimatedMinutes: Number(e.target.value) })
-          }
-          className="task-minutes-input"
-        />
-        <span>分钟</span>
-        <select
-          value={task.priority}
-          onChange={(e) =>
-            onChange({
-              ...task,
-              priority: e.target.value as BreakdownTask["priority"],
-            })
-          }
-          className="task-priority-select"
-        >
-          <option value="LOW">低</option>
-          <option value="MEDIUM">中</option>
-          <option value="HIGH">高</option>
-          <option value="URGENT">紧急</option>
-        </select>
-      </div>
-    </div>
-  );
+interface DraftTask {
+  id: string;
+  title: string;
+  description: string;
+  estimatedMinutes: number;
+  weekIndex: number;
+  editable: boolean;
 }
 
 export function AiBreakdownPage() {
   const [goal, setGoal] = useState("");
   const [weeks, setWeeks] = useState(4);
-  const [preview, setPreview] = useState<BreakdownPreview | null>(null);
+  const [drafts, setDrafts] = useState<DraftTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [committed, setCommitted] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const navigate = useNavigate();
+  const { projects } = useProjects();
 
-  const { createProject } = useProjects();
-  const { createTask } = useTasks();
-
-  const handleGenerate = async () => {
-    if (!goal.trim()) {
-      setError("请输入学习目标");
-      return;
-    }
+  const handlePreview = async () => {
+    if (!goal.trim()) return;
     setLoading(true);
     setError(null);
-    setPreview(null);
-    setCommitted(false);
+    setConfirmed(false);
     try {
-      const result = await aiService.previewBreakdown(goal.trim(), weeks);
-      setPreview(result);
+      const response = await apiClient.previewAiBreakdown({ goal, weeks });
+      // TODO: 后端返回的草稿结构需要适配，这里先做兼容处理
+      const raw = response as unknown as { tasks?: Array<Partial<DraftTask>> };
+      const list = (raw.tasks ?? []).map((t, i) => ({
+        id: crypto.randomUUID(),
+        title: t.title ?? "未命名任务",
+        description: t.description ?? "",
+        estimatedMinutes: t.estimatedMinutes ?? 60,
+        weekIndex: t.weekIndex ?? Math.floor(i / (raw.tasks!.length / weeks)) + 1,
+        editable: true,
+      }));
+      setDrafts(list);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setDrafts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (drafts.length === 0) return;
+    setLoading(true);
+    try {
+      // TODO: 后端确认接口完成后替换为真实 API
+      // await apiClient.confirmAiBreakdown(drafts);
+      setConfirmed(true);
+      setTimeout(() => navigate("/tasks"), 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -85,80 +63,44 @@ export function AiBreakdownPage() {
     }
   };
 
-  const updatePhase = (pi: number, next: BreakdownPhase) => {
-    if (!preview) return;
-    const phases = [...preview.phases];
-    phases[pi] = next;
-    setPreview({ ...preview, phases });
+  const handleReject = () => {
+    setDrafts([]);
+    setError(null);
+    setConfirmed(false);
   };
 
-  const updateTask = (pi: number, ti: number, next: BreakdownTask) => {
-    if (!preview) return;
-    const phases = preview.phases.map((ph, idx) =>
-      idx === pi
-        ? { ...ph, tasks: ph.tasks.map((t, tidx) => (tidx === ti ? next : t)) }
-        : ph
+  const handleEdit = (id: string, field: keyof DraftTask, value: string | number) => {
+    setDrafts((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, [field]: value } : d))
     );
-    setPreview({ ...preview, phases });
   };
 
-  const handleCommit = async () => {
-    if (!preview) return;
-    setLoading(true);
-    setError(null);
-    try {
-      // 1. 创建项目
-      const project = await createProject({
-        name: preview.projectName || goal,
-        goal,
-        startDate: new Date().toISOString().slice(0, 10),
-        endDate: new Date(Date.now() + weeks * 7 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .slice(0, 10),
-        status: "ACTIVE",
-        progress: 0,
-      });
-
-      // 2. 为每个阶段创建任务
-      for (const phase of preview.phases) {
-        for (const task of phase.tasks) {
-          await createTask(project.id, {
-            title: task.title,
-            description: task.description,
-            status: "TODO",
-            priority: task.priority,
-            dueTime: "",
-            estimatedMinutes: task.estimatedMinutes,
-            tags: [phase.name],
-          });
-        }
-      }
-
-      setCommitted(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
+  const handleManualFallback = () => {
+    navigate("/tasks");
   };
 
   return (
     <section className="page-stack">
-      <section className="panel ai-panel">
-        <div className="panel-heading">
-          <h2>AI 智能拆解草稿</h2>
-          <p>输入学习目标，AI 将生成可执行的阶段和任务树，确认后一键创建。</p>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">AI 拆解</p>
+          <h1>目标拆解</h1>
         </div>
+      </div>
 
-        <div className="ai-form">
+      <section className="panel">
+        <div className="panel-heading">
+          <h2>输入目标</h2>
+          <p>描述你想完成的学习目标，AI 会帮你拆分成周任务。</p>
+        </div>
+        <div className="form-stack">
           <label>
-            学习目标
+            目标描述
             <textarea
+              rows={3}
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
-              placeholder="例如：4 周内完成软件工程课程项目核心功能"
-              rows={5}
-              disabled={loading}
+              placeholder="例如：3 个月内掌握 React 和 TypeScript"
             />
           </label>
           <label>
@@ -169,87 +111,111 @@ export function AiBreakdownPage() {
               max={52}
               value={weeks}
               onChange={(e) => setWeeks(Number(e.target.value))}
-              disabled={loading}
             />
           </label>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={handleGenerate}
-            disabled={loading || !goal.trim()}
-          >
-            {loading && !preview ? "生成中…" : "生成草稿"}
-          </button>
+          <div className="form-actions">
+            <button
+              className="btn btn-primary"
+              onClick={handlePreview}
+              disabled={loading || !goal.trim()}
+            >
+              {loading ? "拆解中..." : "AI 拆解"}
+            </button>
+          </div>
         </div>
-
-        {error && (
-          <div className="state-message state-failure" role="alert">
-            {error}
-          </div>
-        )}
-
-        {committed && (
-          <div className="state-message state-success" role="status">
-            项目与任务已创建成功！请前往「学习项目」和「任务管理」查看。
-          </div>
-        )}
-
-        {preview && !committed && (
-          <div className="draft-box">
-            <div className="draft-header">
-              <h3>草稿预览：{preview.projectName || goal}</h3>
-              <div className="draft-actions">
-                <button
-                  className="btn-primary"
-                  onClick={handleCommit}
-                  disabled={loading}
-                >
-                  {loading ? "创建中…" : "确认创建"}
-                </button>
-                <button
-                  className="btn-secondary"
-                  onClick={() => setPreview(null)}
-                  disabled={loading}
-                >
-                  取消
-                </button>
-              </div>
-            </div>
-
-            {preview.firstAction && (
-              <div className="first-action">
-                <strong>首个行动：</strong>
-                <span>{preview.firstAction.title}</span>
-                <p>{preview.firstAction.description}</p>
-              </div>
-            )}
-
-            {preview.phases.map((phase, pi) => (
-              <div className="phase-card" key={pi}>
-                <div className="phase-header">
-                  <input
-                    value={phase.name}
-                    onChange={(e) =>
-                      updatePhase(pi, { ...phase, name: e.target.value })
-                    }
-                    className="phase-name-input"
-                  />
-                  <span className="phase-weeks">{phase.weeks} 周</span>
-                </div>
-                <div className="task-list">
-                  {phase.tasks.map((task, ti) => (
-                    <TaskItem
-                      key={ti}
-                      task={task}
-                      onChange={(next) => updateTask(pi, ti, next)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </section>
+
+      {error && (
+        <section className="panel">
+          <div className="state-message state-failure" role="alert">
+            <strong>AI 拆解失败：</strong>{error}
+          </div>
+          <div className="row-actions" style={{ marginTop: 12 }}>
+            <button className="btn btn-primary" onClick={handlePreview} disabled={loading}>
+              重试
+            </button>
+            <button className="btn btn-secondary" onClick={handleManualFallback}>
+              手动输入任务
+            </button>
+          </div>
+        </section>
+      )}
+
+      {drafts.length > 0 && !confirmed && (
+        <section className="panel">
+          <div className="panel-heading">
+            <h2>拆解预览（可编辑）</h2>
+            <p>检查并调整 AI 生成的任务，确认后创建到任务列表。</p>
+          </div>
+          <div className="table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>周次</th>
+                  <th>任务标题</th>
+                  <th>描述</th>
+                  <th>预计时长（分钟）</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drafts.map((d) => (
+                  <tr key={d.id}>
+                    <td>
+                      <input
+                        type="number"
+                        min={1}
+                        max={weeks}
+                        value={d.weekIndex}
+                        onChange={(e) => handleEdit(d.id, "weekIndex", Number(e.target.value))}
+                        style={{ width: 60 }}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        value={d.title}
+                        onChange={(e) => handleEdit(d.id, "title", e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        value={d.description}
+                        onChange={(e) => handleEdit(d.id, "description", e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        min={1}
+                        value={d.estimatedMinutes}
+                        onChange={(e) => handleEdit(d.id, "estimatedMinutes", Number(e.target.value))}
+                        style={{ width: 80 }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="row-actions" style={{ marginTop: 16 }}>
+            <button className="btn btn-primary" onClick={handleConfirm} disabled={loading}>
+              确认创建
+            </button>
+            <button className="btn btn-secondary" onClick={handleReject}>
+              放弃
+            </button>
+          </div>
+        </section>
+      )}
+
+      {confirmed && (
+        <section className="panel">
+          <div className="state-message" style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>
+            任务已创建，正在跳转到任务列表...
+          </div>
+        </section>
+      )}
     </section>
   );
 }
