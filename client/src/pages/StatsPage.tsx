@@ -1,3 +1,4 @@
+import { CheckCircle, TrendingUp, Clock, BarChart3 } from "lucide-react";
 import { useStats } from "../hooks/useStats";
 
 function formatDateLabel(dateStr: string): string {
@@ -38,12 +39,12 @@ function PieChart({
   if (total === 0) return null;
 
   const colors = [
-    "var(--accent)",
-    "oklch(65% 0.12 200)",
-    "oklch(70% 0.11 250)",
-    "oklch(60% 0.13 145)",
-    "oklch(68% 0.14 65)",
-    "oklch(55% 0.12 30)",
+    "#4A7DFF",
+    "#52C41A",
+    "#FAAD14",
+    "#FF4D4F",
+    "#1890FF",
+    "#722ED1",
   ];
 
   let cumulative = 0;
@@ -107,12 +108,12 @@ export function StatsPage() {
     <section className="page-stack">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">统计复盘</p>
-          <h1>本周概览</h1>
+          <p className="eyebrow">Statistics</p>
+          <h1>学习数据看板</h1>
         </div>
         <div className="panel-actions">
           {cached && (
-            <span className="badge status-paused" aria-label="离线缓存">
+            <span className="badge orange" aria-label="离线缓存">
               离线缓存
             </span>
           )}
@@ -141,21 +142,45 @@ export function StatsPage() {
           {/* 核心指标 */}
           <div className="metric-grid" aria-label="核心指标">
             <article className="metric-card">
-              <span>本周完成数</span>
-              <strong>{stats.totalCompleted}</strong>
+              <div className="metric-icon green">
+                <CheckCircle size={22} />
+              </div>
+              <div className="metric-content">
+                <strong>{stats.totalCompleted}</strong>
+                <span>本周完成数</span>
+              </div>
             </article>
             <article className="metric-card">
-              <span>完成率</span>
-              <strong>{stats.completionRate}%</strong>
+              <div className="metric-icon blue">
+                <TrendingUp size={22} />
+              </div>
+              <div className="metric-content">
+                <strong>{stats.completionRate}%</strong>
+                <span>完成率</span>
+              </div>
             </article>
             <article className="metric-card">
-              <span>总学习时长</span>
-              <strong>
-                {Math.round(
-                  stats.dailyMinutes.reduce((s, d) => s + d.minutes, 0) / 60
-                )}
-                h
-              </strong>
+              <div className="metric-icon cyan">
+                <Clock size={22} />
+              </div>
+              <div className="metric-content">
+                <strong>
+                  {Math.round(
+                    stats.dailyMinutes.reduce((s, d) => s + d.minutes, 0) / 60
+                  )}
+                  h
+                </strong>
+                <span>总学习时长</span>
+              </div>
+            </article>
+            <article className="metric-card">
+              <div className="metric-icon orange">
+                <BarChart3 size={22} />
+              </div>
+              <div className="metric-content">
+                <strong>{stats.projectDistribution.length}</strong>
+                <span>活跃项目</span>
+              </div>
             </article>
           </div>
 
