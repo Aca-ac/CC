@@ -79,3 +79,10 @@
 - 改动文件：无源码改动，仅执行 Git 操作。
 - 改动目的：初始化本地 Git 仓库，提交脚手架和既有资料文件，并推送到 GitHub。
 - 验证结果：已提交 `d87e3da chore: scaffold Chronos framework`；已推送到 `https://github.com/Vincent-Ctrl-18/Chronos.git` 的 `main` 分支，并设置本地 `main` 跟踪 `origin/main`。
+
+## 2026-06-18 收尾阶段 1（后端集成 + CI）
+
+- 改动文件：`server/`（合并 PR #67 的 M2 后端：计时器/统计/学习日志/同步/AI provider，并修复 6 项评审问题）、`server/src/main/java/com/chronos/ai/provider/OpenAiCompatibleProvider.java`+`AiProviderFactory.java`+`application.yml`（新增通用 OpenAI 兼容 provider，provider 名 `openai`，由 BYOK 设置驱动）、`client/src/hooks/useSync.ts`+`client/src/services/__tests__/syncService.test.ts`（吸收 PR #61 同步逻辑：补齐 useSync hook 与 push/conflict 特征测试，未重写仓储层、未改 UI）、`.github/workflows/ci.yml`（移除 `backend-test`/`mysql-smoke` 的 `if:false` 门禁；`backend-test` 改为纯 H2 运行、不依赖 MySQL 服务；`frontend-check` 增加 `npx vitest run --root client`）、`client/src/hooks/__tests__/useTimer.test.ts`+`client/src/components/__tests__/AppLayout.test.tsx`（修正两处历史失效断言：计时器"防止多活跃"改为断言 error 状态而非抛异常；AppLayout 改为校验品牌文案）。
+- 改动目的：完成项目收尾的第 1 阶段——合并并加固未合并的后端 PR、把 AI 泛化为 OpenAI 兼容协议、吸收前端同步逻辑的缺失部分、让此前被禁用的 CI 检查真正运行并通过。
+- 验证结果：`./server/mvnw verify` 全绿（56 项测试，JaCoCo 覆盖率报告生成）；`npx vitest run`（client）全绿（12 文件 / 38 测试）；`.github/workflows/ci.yml` 通过 `yaml.safe_load` 校验且三个 job 均已启用。
+- 待办（后续阶段）：sync 模块的用户隔离（push 未写 userId、controller 无鉴权）留待阶段 3 鉴权接入时统一处理；前端计时器测试使用真实 `setTimeout`（整套约 3-4 分钟），建议阶段 2 改用 fake timers 提速。
