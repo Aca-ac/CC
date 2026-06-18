@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS ai_advices (
 
 CREATE TABLE IF NOT EXISTS sync_records (
     id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL DEFAULT 'legacy',
     entity_type VARCHAR(40) NOT NULL,
     entity_id VARCHAR(64) NOT NULL,
     change_type VARCHAR(20) NOT NULL,

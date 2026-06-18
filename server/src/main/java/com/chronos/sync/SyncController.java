@@ -1,5 +1,6 @@
 package com.chronos.sync;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.chronos.common.ApiResponse;
 import com.chronos.sync.dto.SyncPullResponse;
 import com.chronos.sync.dto.SyncPushRequest;
@@ -25,16 +26,16 @@ public class SyncController {
 
     @PostMapping("/push")
     public ApiResponse<SyncPushResponse> push(@Valid @RequestBody SyncPushRequest request) {
-        return ApiResponse.ok(syncService.push(request));
+        return ApiResponse.ok(syncService.push(StpUtil.getLoginIdAsString(), request));
     }
 
     @GetMapping("/pull")
     public ApiResponse<SyncPullResponse> pull(@RequestParam(required = false) String cursor) {
-        return ApiResponse.ok(syncService.pull(cursor));
+        return ApiResponse.ok(syncService.pull(StpUtil.getLoginIdAsString(), cursor));
     }
 
     @PostMapping("/resolve")
     public ApiResponse<SyncResolveResponse> resolve(@Valid @RequestBody SyncResolveRequest request) {
-        return ApiResponse.ok(syncService.resolve(request));
+        return ApiResponse.ok(syncService.resolve(StpUtil.getLoginIdAsString(), request));
     }
 }

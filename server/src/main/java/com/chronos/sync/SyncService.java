@@ -30,13 +30,14 @@ public class SyncService extends ServiceImpl<SyncRecordMapper, SyncRecord> {
             new com.fasterxml.jackson.databind.ObjectMapper();
 
     @Transactional(rollbackFor = Exception.class)
-    public SyncPushResponse push(SyncPushRequest request) {
+    public SyncPushResponse push(String userId, SyncPushRequest request) {
         int acceptedTotal = 0;
         int conflictTotal = 0;
 
         for (SyncRecordDto dto : request.records()) {
             SyncRecord existing = this.getOne(
                 new LambdaQueryWrapper<SyncRecord>()
+                    .eq(SyncRecord::getUserId, userId)
                     .eq(SyncRecord::getEntityType, dto.entityType())
                     .eq(SyncRecord::getEntityId, dto.entityId())
             );
@@ -48,6 +49,7 @@ public class SyncService extends ServiceImpl<SyncRecordMapper, SyncRecord> {
             } else {
                 SyncRecord record = new SyncRecord();
                 record.setId(UUID.randomUUID().toString());
+                record.setUserId(userId);
                 record.setEntityType(dto.entityType());
                 record.setEntityId(dto.entityId());
                 record.setChangeType(dto.changeType());
@@ -78,9 +80,10 @@ public class SyncService extends ServiceImpl<SyncRecordMapper, SyncRecord> {
         return new SyncPushResponse(acceptedTotal, conflictTotal);
     }
 
-    public SyncPullResponse pull(String cursor) {
+    public SyncPullResponse pull(String userId, String cursor) {
         List<SyncRecord> pendingRecords = this.list(
             new LambdaQueryWrapper<SyncRecord>()
+                .eq(SyncRecord::getUserId, userId)
                 .eq(SyncRecord::getSyncStatus, "PENDING")
                 .orderByDesc(SyncRecord::getLastModifiedAt)
         );
@@ -117,9 +120,10 @@ public class SyncService extends ServiceImpl<SyncRecordMapper, SyncRecord> {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public SyncResolveResponse resolve(SyncResolveRequest request) {
+    public SyncResolveResponse resolve(String userId, SyncResolveRequest request) {
         SyncRecord existing = this.getOne(
             new LambdaQueryWrapper<SyncRecord>()
+                .eq(SyncRecord::getUserId, userId)
                 .eq(SyncRecord::getEntityType, request.entityType())
                 .eq(SyncRecord::getEntityId, request.entityId())
         );
