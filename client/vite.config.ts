@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import fs from "node:fs";
 
 const appBase = process.env.VITE_APP_BASE ?? "./";
@@ -9,7 +10,7 @@ const packageJson = JSON.parse(
 
 export default defineConfig({
   base: appBase,
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
   },

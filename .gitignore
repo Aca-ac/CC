@@ -38,3 +38,7 @@ temp/
 *.sqlite
 *.sqlite3
 *.db
+
+# Playwright / local visual-check artifacts
+.playwright-mcp/
+/*.png

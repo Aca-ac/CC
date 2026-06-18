@@ -1,15 +1,15 @@
-import {
-  BarChart3,
-  Bot,
-  BookOpen,
-  CalendarDays,
-  ClipboardList,
-  LayoutDashboard,
-  ListChecks,
-  Settings,
-} from "lucide-react";
 import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppLayout, type NavigationItem } from "./components/AppLayout";
+import {
+  IconAi,
+  IconCalendar,
+  IconDashboard,
+  IconLogs,
+  IconProjects,
+  IconSettings,
+  IconStats,
+  IconTasks,
+} from "./components/icons";
 import { useAuth } from "./hooks/useAuth";
 import { AiBreakdownPage } from "./pages/AiBreakdownPage";
 import { CalendarPage } from "./pages/CalendarPage";
@@ -23,14 +23,14 @@ import { StatsPage } from "./pages/StatsPage";
 import { TasksPage } from "./pages/TasksPage";
 
 const navigation: NavigationItem[] = [
-  { path: "/dashboard", label: "今日看板", icon: LayoutDashboard },
-  { path: "/projects", label: "学习项目", icon: ClipboardList },
-  { path: "/tasks", label: "任务管理", icon: ListChecks },
-  { path: "/logs", label: "日志与计时", icon: BookOpen },
-  { path: "/calendar", label: "周视图", icon: CalendarDays },
-  { path: "/ai", label: "AI 拆解", icon: Bot },
-  { path: "/stats", label: "统计复盘", icon: BarChart3 },
-  { path: "/settings", label: "系统设置", icon: Settings },
+  { path: "/dashboard", label: "今日看板", icon: IconDashboard },
+  { path: "/projects", label: "学习项目", icon: IconProjects },
+  { path: "/tasks", label: "任务管理", icon: IconTasks },
+  { path: "/logs", label: "日志与计时", icon: IconLogs },
+  { path: "/calendar", label: "周视图", icon: IconCalendar },
+  { path: "/ai", label: "AI 拆解", icon: IconAi },
+  { path: "/stats", label: "统计复盘", icon: IconStats },
+  { path: "/settings", label: "系统设置", icon: IconSettings },
 ];
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
