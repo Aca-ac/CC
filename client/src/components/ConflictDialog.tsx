@@ -1,7 +1,7 @@
-import { AlertTriangle, Cloud, HardDrive, X } from "lucide-react";
+import type { ReactNode } from "react";
+import { IconAlert, IconCheck, IconUpload, IconUser } from "./icons";
+import { Badge, Button, Card, StateMessage, Modal } from "./ui";
 import type { ConflictValue } from "../storage/db";
-
-// ── 类型 ────────────────────────────────────────────────────────
 
 interface ConflictDialogProps {
   /** 当前冲突列表 */
@@ -18,9 +18,7 @@ interface ConflictDialogProps {
   onResolve: (conflictId: string, resolution: "local" | "remote") => Promise<boolean>;
 }
 
-// ── 辅助 ────────────────────────────────────────────────────────
-
-const ENTITY_TYPE_LABEL: Record<ConflictValue["entityType"], string> = {
+const ENTITY_TYPE_LABEL: Record<string, string> = {
   PROJECT: "项目",
   TASK: "任务",
   LOG: "学习日志",
@@ -49,7 +47,39 @@ function extractTitle(data: Record<string, unknown>): string {
   return (data.title as string) ?? (data.name as string) ?? (data.content as string) ?? "(未知)";
 }
 
-// ── 组件 ────────────────────────────────────────────────────────
+function JsonPanel({
+  title,
+  icon,
+  tone,
+  data,
+  createdAt,
+}: {
+  title: string;
+  icon: ReactNode;
+  tone: "brand" | "info";
+  data: Record<string, unknown>;
+  createdAt: number;
+}) {
+  return (
+    <Card className="min-w-0 bg-surface">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-panel-muted text-brand">
+            {icon}
+          </span>
+          <div className="min-w-0">
+            <p className="text-[0.9rem] font-semibold text-ink">{title}</p>
+            <p className="mt-0.5 text-[0.74rem] text-muted">{formatTimestamp(createdAt)}</p>
+          </div>
+        </div>
+        <Badge tone={tone}>{title.includes("本机") ? "local" : "cloud"}</Badge>
+      </div>
+      <pre className="max-h-[320px] overflow-auto rounded-lg border border-line bg-panel p-3 text-[0.78rem] leading-relaxed text-ink">
+        {JSON.stringify(data, null, 2)}
+      </pre>
+    </Card>
+  );
+}
 
 export function ConflictDialog({
   conflicts,
@@ -62,9 +92,9 @@ export function ConflictDialog({
   if (!open || conflicts.length === 0) return null;
 
   const current = conflicts[0];
-
   const localParsed = tryParseJson(current.localData);
   const remoteParsed = tryParseJson(current.remoteData);
+  const entityType = ENTITY_TYPE_LABEL[current.entityType] ?? current.entityType;
 
   const handleResolve = async (resolution: "local" | "remote") => {
     const success = await onResolve(current.id, resolution);
@@ -74,98 +104,62 @@ export function ConflictDialog({
   };
 
   return (
-    <div className="conflict-overlay" role="dialog" aria-modal="true" aria-label="冲突解决">
-      <div className="conflict-dialog">
-        {/* 头部 */}
-        <div className="conflict-header">
-          <div className="conflict-header-icon">
-            <AlertTriangle size={20} />
-          </div>
-          <div>
-            <h2>数据冲突</h2>
-            <p className="conflict-subtitle">
-              {ENTITY_TYPE_LABEL[current.entityType]} · {extractTitle(localParsed)}
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="数据冲突"
+      subtitle={`${entityType} · ${extractTitle(localParsed)}`}
+      width={920}
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => handleResolve("remote")} disabled={resolving}>
+            <IconUpload size={16} />
+            保留云端副本
+          </Button>
+          <Button onClick={() => handleResolve("local")} disabled={resolving}>
+            <IconCheck size={16} />
+            保留本机副本
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-start gap-2">
+            <IconAlert size={18} className="mt-0.5 text-warning" />
+            <p className="max-w-[620px] text-[0.86rem] leading-relaxed text-muted">
+              同一条数据在本机和云端同时变化。Chronos 不做自动合并，请选择要保留的副本。
             </p>
           </div>
-          <button
-            className="conflict-close"
-            onClick={onClose}
-            aria-label="关闭"
-            disabled={resolving}
-          >
-            <X size={18} />
-          </button>
+          {conflicts.length > 1 && <Badge tone="warning">第 1 / {conflicts.length} 个冲突</Badge>}
         </div>
 
-        {/* 冲突计数 */}
-        {conflicts.length > 1 && (
-          <div className="conflict-counter">
-            第 1 / {conflicts.length} 个冲突
-          </div>
-        )}
-
-        {/* 版本对比 */}
-        <div className="conflict-compare">
-          {/* 本地版本 */}
-          <div className="conflict-side conflict-local">
-            <div className="conflict-side-header">
-              <HardDrive size={16} />
-              <span>本地版本</span>
-            </div>
-            <pre className="conflict-json">{JSON.stringify(localParsed, null, 2)}</pre>
-            <time className="conflict-time">{formatTimestamp(current.createdAt)}</time>
-          </div>
-
-          {/* VS 分隔 */}
-          <div className="conflict-vs" aria-hidden="true">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+          <JsonPanel
+            title="本机副本"
+            icon={<IconUser size={16} />}
+            tone="brand"
+            data={localParsed}
+            createdAt={current.createdAt}
+          />
+          <div className="hidden items-center justify-center px-1 text-[0.74rem] font-semibold text-muted lg:flex">
             VS
           </div>
-
-          {/* 云端版本 */}
-          <div className="conflict-side conflict-remote">
-            <div className="conflict-side-header">
-              <Cloud size={16} />
-              <span>云端版本</span>
-            </div>
-            <pre className="conflict-json">{JSON.stringify(remoteParsed, null, 2)}</pre>
-            <time className="conflict-time">
-              {formatTimestamp(current.createdAt)}
-            </time>
-          </div>
+          <JsonPanel
+            title="云端副本"
+            icon={<IconUpload size={16} />}
+            tone="info"
+            data={remoteParsed}
+            createdAt={current.createdAt}
+          />
         </div>
 
-        {/* 策略说明 */}
-        <p className="conflict-policy">
-          不做自动合并，请选择保留哪个版本。
-        </p>
-
-        {/* 错误提示 */}
         {error && (
-          <div className="conflict-error" role="alert">
-            {error}
+          <div role="alert">
+            <StateMessage kind="error">{error}</StateMessage>
           </div>
         )}
-
-        {/* 操作按钮 */}
-        <div className="conflict-actions">
-          <button
-            className="btn btn-secondary"
-            onClick={() => handleResolve("remote")}
-            disabled={resolving}
-          >
-            <Cloud size={16} />
-            保留云端版本
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => handleResolve("local")}
-            disabled={resolving}
-          >
-            <HardDrive size={16} />
-            保留本地版本
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

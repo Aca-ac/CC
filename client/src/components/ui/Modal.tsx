@@ -42,6 +42,7 @@ export function Modal({ open, onClose, title, subtitle, children, footer, width 
           <motion.div
             role="dialog"
             aria-modal="true"
+            aria-label={typeof title === "string" ? title : undefined}
             className="flex max-h-[90vh] w-full flex-col overflow-hidden rounded-lg border border-line bg-panel shadow-float"
             style={{ maxWidth: width }}
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
