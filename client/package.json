@@ -59,7 +59,7 @@
       "package.json"
     ],
     "win": {
-      "icon": "public/app-icon.ico",
+      "icon": "public/icons/chronos-512.png",
       "target": [
         {
           "target": "nsis",
