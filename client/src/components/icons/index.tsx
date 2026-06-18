@@ -178,6 +178,23 @@ export const IconMenu: IconComponent = (p) => (
   </Svg>
 );
 
+export const IconGrip: IconComponent = (p) => (
+  <Svg {...p}>
+    <path d="M8.3 5.6h.02" />
+    <path d="M15.8 5.7h.02" />
+    <path d="M8.1 12h.02" />
+    <path d="M15.9 12.1h.02" />
+    <path d="M8.4 18.3h.02" />
+    <path d="M15.7 18.2h.02" />
+  </Svg>
+);
+
+export const IconChevronRight: IconComponent = (p) => (
+  <Svg {...p}>
+    <path d="M9 5.6c2.1 2 4 4.1 5.8 6.4-1.8 2.3-3.7 4.4-5.8 6.4" />
+  </Svg>
+);
+
 export const IconUser: IconComponent = (p) => (
   <Svg {...p}>
     <path d="M15.7 8.6a3.7 3.7 0 1 1-7.4 0 3.7 3.7 0 0 1 7.4 0Z" />

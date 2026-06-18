@@ -44,6 +44,7 @@ export interface Task {
   dueTime?: string;
   estimatedMinutes: number;
   tags: string[];
+  orderIndex?: number;
 }
 
 export interface LearningLog {
@@ -98,4 +99,3 @@ export interface DashboardSummary {
   habitStreak: number;
   syncPendingTotal: number;
 }
-

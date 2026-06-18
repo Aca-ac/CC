@@ -1,6 +1,16 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { IconCheckCircle, IconClock, IconEdit, IconPlus, IconRefresh, IconTasks, IconTrash } from "../components/icons";
+import {
+  IconCheckCircle,
+  IconChevronRight,
+  IconClock,
+  IconEdit,
+  IconGrip,
+  IconPlus,
+  IconRefresh,
+  IconTasks,
+  IconTrash,
+} from "../components/icons";
 import { PriorityBadge, StatusBadge } from "../components/StatusBadge";
 import {
   Badge,
@@ -19,9 +29,10 @@ import {
 } from "../components/ui";
 import { useProjects } from "../hooks/useProjects";
 import { useTasks } from "../hooks/useTasks";
+import { cn } from "../lib/cn";
 import { fadeUp, staggerContainer } from "../lib/motion";
 import type { TaskValue } from "../storage/db";
-import type { TaskPriority, TaskStatus } from "../types/domain";
+import type { Task, TaskPriority, TaskStatus } from "../types/domain";
 
 type TaskForm = Omit<
   TaskValue,
@@ -70,6 +81,14 @@ function formatDueTime(value?: string): string {
   });
 }
 
+function moveIdBefore(ids: string[], sourceId: string, targetId: string): string[] {
+  if (sourceId === targetId) return ids;
+  const withoutSource = ids.filter((id) => id !== sourceId);
+  const targetIndex = withoutSource.indexOf(targetId);
+  withoutSource.splice(targetIndex >= 0 ? targetIndex : withoutSource.length, 0, sourceId);
+  return withoutSource;
+}
+
 export function TasksPage() {
   const {
     tasks,
@@ -80,6 +99,7 @@ export function TasksPage() {
     updateTask,
     deleteTask,
     changeStatus,
+    reorderTasks,
     refresh,
   } = useTasks();
   const { projects } = useProjects();
@@ -93,22 +113,79 @@ export function TasksPage() {
   const [projectFilter, setProjectFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "ALL">("ALL");
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "ALL">("ALL");
+  const [tagFilter, setTagFilter] = useState("ALL");
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [collapsedParentIds, setCollapsedParentIds] = useState<Set<string>>(() => new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const projectName = useMemo(() => {
     return new Map(projects.map((project) => [project.id, project.name]));
   }, [projects]);
+
+  const allTags = useMemo(() => {
+    return Array.from(new Set(tasks.flatMap((task) => task.tags))).sort((a, b) =>
+      a.localeCompare(b, "zh-CN")
+    );
+  }, [tasks]);
+
+  const descendantIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!editingId) return ids;
+
+    const byParent = new Map<string, Task[]>();
+    for (const task of tasks) {
+      if (!task.parentTaskId) continue;
+      byParent.set(task.parentTaskId, [...(byParent.get(task.parentTaskId) ?? []), task]);
+    }
+
+    const visit = (parentId: string) => {
+      for (const child of byParent.get(parentId) ?? []) {
+        ids.add(child.id);
+        visit(child.id);
+      }
+    };
+    visit(editingId);
+    return ids;
+  }, [editingId, tasks]);
+
+  const parentTaskOptions = useMemo(() => {
+    return tasks.filter((task) => {
+      if (task.id === editingId) return false;
+      if (descendantIds.has(task.id)) return false;
+      if (formProjectId && task.projectId !== formProjectId) return false;
+      return true;
+    });
+  }, [descendantIds, editingId, formProjectId, tasks]);
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
       if (projectFilter !== "ALL" && task.projectId !== projectFilter) return false;
       if (statusFilter !== "ALL" && task.status !== statusFilter) return false;
       if (priorityFilter !== "ALL" && task.priority !== priorityFilter) return false;
+      if (tagFilter !== "ALL" && !task.tags.includes(tagFilter)) return false;
       return true;
     });
-  }, [priorityFilter, projectFilter, statusFilter, tasks]);
+  }, [priorityFilter, projectFilter, statusFilter, tagFilter, tasks]);
+
+  const visibleTaskIds = useMemo(() => {
+    return new Set(filteredTasks.map((task) => task.id));
+  }, [filteredTasks]);
+
+  const childTasksByParent = useMemo(() => {
+    const grouped = new Map<string, Task[]>();
+    for (const task of filteredTasks) {
+      if (!task.parentTaskId || !visibleTaskIds.has(task.parentTaskId)) continue;
+      grouped.set(task.parentTaskId, [...(grouped.get(task.parentTaskId) ?? []), task]);
+    }
+    return grouped;
+  }, [filteredTasks, visibleTaskIds]);
+
+  const topLevelTasks = useMemo(() => {
+    return filteredTasks.filter((task) => !task.parentTaskId || !visibleTaskIds.has(task.parentTaskId));
+  }, [filteredTasks, visibleTaskIds]);
 
   const resetForm = () => {
-    setForm(emptyTaskForm);
+    setForm({ ...emptyTaskForm, tags: [] });
     setFormProjectId("");
     setFormError(null);
     setEditingId(null);
@@ -140,17 +217,35 @@ export function TasksPage() {
     resetForm();
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleProjectChange = (projectId: string) => {
+    setFormProjectId(projectId);
+    setForm((prev) => {
+      const parent = tasks.find((task) => task.id === prev.parentTaskId);
+      if (!parent || !projectId || parent.projectId === projectId) return prev;
+      return { ...prev, parentTaskId: undefined };
+    });
+  };
+
+  const handleParentChange = (parentTaskId: string) => {
+    const parent = tasks.find((task) => task.id === parentTaskId);
+    setForm((prev) => ({ ...prev, parentTaskId: parentTaskId || undefined }));
+    if (!editingId && parent) setFormProjectId(parent.projectId);
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) {
       setFormError("任务标题不能为空");
       return;
     }
     try {
+      setActionError(null);
       const payload = {
         ...form,
+        parentTaskId: form.parentTaskId || undefined,
         estimatedMinutes: Math.max(0, form.estimatedMinutes),
         dueTime: form.dueTime || undefined,
+        tags: form.tags.map((tag) => tag.trim()).filter(Boolean),
       };
       if (editingId) {
         await updateTask(editingId, payload);
@@ -173,15 +268,146 @@ export function TasksPage() {
     setDeleteTarget(null);
   };
 
+  const handleDragStart = (event: DragEvent<HTMLElement>, taskId: string) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", taskId);
+    setDraggingId(taskId);
+  };
+
+  const handleDrop = async (event: DragEvent<HTMLElement>, targetId: string) => {
+    event.preventDefault();
+    const sourceId = draggingId ?? event.dataTransfer.getData("text/plain");
+    setDraggingId(null);
+    if (!sourceId || sourceId === targetId) return;
+
+    try {
+      setActionError(null);
+      await reorderTasks(moveIdBefore(tasks.map((task) => task.id), sourceId, targetId));
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const toggleChildren = (taskId: string) => {
+    setCollapsedParentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
   const doneCount = tasks.filter((task) => task.status === "DONE").length;
   const activeCount = tasks.filter((task) => task.status !== "DONE" && task.status !== "ARCHIVED").length;
+
+  const renderTaskItem = (task: Task, depth = 0): ReactNode => {
+    const childTasks = childTasksByParent.get(task.id) ?? [];
+    const isCollapsed = collapsedParentIds.has(task.id);
+
+    return (
+      <Fragment key={task.id}>
+        <motion.li
+          variants={fadeUp}
+          draggable
+          onDragStartCapture={(event) => handleDragStart(event, task.id)}
+          onDragOver={(event) => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+          }}
+          onDrop={(event) => handleDrop(event, task.id)}
+          onDragEnd={() => setDraggingId(null)}
+          className={cn("group", depth > 0 && "pl-5 sm:pl-8")}
+        >
+          <Card
+            className={cn(
+              "grid gap-3 transition-[border-color,box-shadow,opacity,transform] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center",
+              depth > 0 && "border-l-2 border-l-brand bg-panel-muted/60",
+              draggingId === task.id && "opacity-60 shadow-float"
+            )}
+          >
+            <div className="flex min-w-0 items-start gap-3">
+              <span
+                className="mt-1 grid h-7 w-5 shrink-0 cursor-grab place-items-center text-muted transition-colors group-hover:text-brand"
+                title="拖动排序"
+                aria-hidden="true"
+              >
+                <IconGrip size={15} />
+              </span>
+              <button
+                type="button"
+                onClick={() => changeStatus(task.id, task.status === "DONE" ? "TODO" : "DONE")}
+                aria-label={task.status === "DONE" ? "标记为未完成" : "标记为已完成"}
+                className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-md border border-line bg-panel-muted text-muted transition-colors hover:border-brand hover:text-brand"
+              >
+                {task.status === "DONE" ? <IconCheckCircle size={17} /> : <IconClock size={17} />}
+              </button>
+              <div className="min-w-0">
+                <h3 className="truncate text-[0.95rem] font-semibold text-ink">{task.title}</h3>
+                {task.description && (
+                  <p className="mt-0.5 line-clamp-2 text-[0.82rem] text-muted">{task.description}</p>
+                )}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <Badge tone="neutral">{projectName.get(task.projectId) ?? task.projectId}</Badge>
+                  <Badge tone="info">截止 {formatDueTime(task.dueTime)}</Badge>
+                  {task.parentTaskId && <Badge tone="neutral">子任务</Badge>}
+                  {childTasks.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleChildren(task.id)}
+                      aria-expanded={!isCollapsed}
+                      className="inline-flex h-6 items-center gap-1 rounded-md border border-line bg-panel px-2 text-[0.72rem] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
+                    >
+                      <IconChevronRight
+                        size={13}
+                        className={cn("transition-transform", !isCollapsed && "rotate-90")}
+                      />
+                      {childTasks.length} 个子任务
+                    </button>
+                  )}
+                  {task.tags.map((tag) => (
+                    <Badge key={tag} tone="neutral">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => changeStatus(task.id, nextStatus(task.status))}
+                title="点击切换状态"
+                className="rounded-md transition-transform hover:-translate-y-px"
+              >
+                <StatusBadge status={task.status} />
+              </button>
+              <PriorityBadge priority={task.priority} />
+              <Button variant="secondary" size="sm" onClick={() => openEdit(task)}>
+                <IconEdit size={14} />
+                编辑
+              </Button>
+              <Button variant="danger" size="sm" onClick={() => setDeleteTarget(task)}>
+                <IconTrash size={14} />
+                删除
+              </Button>
+            </div>
+          </Card>
+        </motion.li>
+        {!isCollapsed && childTasks.map((childTask) => renderTaskItem(childTask, depth + 1))}
+      </Fragment>
+    );
+  };
 
   return (
     <div className="space-y-5">
       <PageHeader
         eyebrow="Tasks"
         title="任务管理"
-        description="按项目、状态和优先级快速整理学习任务。"
+        description="按项目、状态、标签和优先级整理学习任务。"
         actions={
           <>
             {!online && (
@@ -225,13 +451,23 @@ export function TasksPage() {
 
         <Card>
           <CardHeader title="筛选" subtitle="筛选只影响当前视图，不改动本地数据。" className="mb-3" />
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Field label="项目筛选">
               <Select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
                 <option value="ALL">全部项目</option>
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="标签筛选">
+              <Select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
+                <option value="ALL">全部标签</option>
+                {allTags.map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag}
                   </option>
                 ))}
               </Select>
@@ -266,6 +502,7 @@ export function TasksPage() {
 
       {loading && <SkeletonList rows={5} />}
       {error && <StateMessage kind="error">加载失败：{error}</StateMessage>}
+      {actionError && <StateMessage kind="error">操作失败：{actionError}</StateMessage>}
 
       {!loading && !error && tasks.length === 0 && (
         <EmptyState
@@ -279,7 +516,7 @@ export function TasksPage() {
         <EmptyState
           icon={IconTasks}
           title="当前筛选没有任务"
-          description="切换项目、状态或优先级筛选后再试。"
+          description="切换项目、标签、状态或优先级筛选后再试。"
           compact
         />
       )}
@@ -291,57 +528,7 @@ export function TasksPage() {
           animate="show"
           className="space-y-2.5"
         >
-          {filteredTasks.map((task) => (
-            <motion.li key={task.id} variants={fadeUp}>
-              <Card className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                <div className="flex min-w-0 items-start gap-3">
-                  <button
-                    type="button"
-                    onClick={() => changeStatus(task.id, task.status === "DONE" ? "TODO" : "DONE")}
-                    aria-label={task.status === "DONE" ? "标记为未完成" : "标记为已完成"}
-                    className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-md border border-line bg-panel-muted text-muted transition-colors hover:border-brand hover:text-brand"
-                  >
-                    {task.status === "DONE" ? <IconCheckCircle size={17} /> : <IconClock size={17} />}
-                  </button>
-                  <div className="min-w-0">
-                    <h3 className="truncate text-[0.95rem] font-semibold text-ink">{task.title}</h3>
-                    {task.description && (
-                      <p className="mt-0.5 line-clamp-2 text-[0.82rem] text-muted">{task.description}</p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      <Badge tone="neutral">{projectName.get(task.projectId) ?? task.projectId}</Badge>
-                      <Badge tone="info">截止 {formatDueTime(task.dueTime)}</Badge>
-                      {task.tags.map((tag) => (
-                        <Badge key={tag} tone="neutral">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => changeStatus(task.id, nextStatus(task.status))}
-                    title="点击切换状态"
-                    className="rounded-md transition-transform hover:-translate-y-px"
-                  >
-                    <StatusBadge status={task.status} />
-                  </button>
-                  <PriorityBadge priority={task.priority} />
-                  <Button variant="secondary" size="sm" onClick={() => openEdit(task)}>
-                    <IconEdit size={14} />
-                    编辑
-                  </Button>
-                  <Button variant="danger" size="sm" onClick={() => setDeleteTarget(task)}>
-                    <IconTrash size={14} />
-                    删除
-                  </Button>
-                </div>
-              </Card>
-            </motion.li>
-          ))}
+          {topLevelTasks.map((task) => renderTaskItem(task))}
         </motion.ul>
       )}
 
@@ -365,7 +552,7 @@ export function TasksPage() {
         <form id="task-form" onSubmit={handleSubmit} className="grid gap-3.5">
           {!editingId && (
             <Field label="所属项目">
-              <Select value={formProjectId} onChange={(e) => setFormProjectId(e.target.value)}>
+              <Select value={formProjectId} onChange={(e) => handleProjectChange(e.target.value)}>
                 <option value="">选择一个项目</option>
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
@@ -375,6 +562,16 @@ export function TasksPage() {
               </Select>
             </Field>
           )}
+          <Field label="父任务">
+            <Select value={form.parentTaskId ?? ""} onChange={(e) => handleParentChange(e.target.value)}>
+              <option value="">无父任务</option>
+              {parentTaskOptions.map((task) => (
+                <option key={task.id} value={task.id}>
+                  {task.title}
+                </option>
+              ))}
+            </Select>
+          </Field>
           <Field label="标题">
             <Input
               value={form.title}
