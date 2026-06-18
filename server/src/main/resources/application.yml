@@ -1,5 +1,9 @@
 server:
   port: ${SERVER_PORT:8080}
+  # 部署在 nginx 反代后：TLS 在 nginx 终止，后端收到的是明文 HTTP。
+  # 让 Spring 识别 nginx 传来的 X-Forwarded-Proto，使 request.isSecure() 在
+  # HTTPS 访问时返回 true（否则 BYOK 写入的 HTTPS 校验会误判失败）。
+  forward-headers-strategy: framework
 
 spring:
   application:

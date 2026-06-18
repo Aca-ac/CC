@@ -110,6 +110,19 @@ CREATE TABLE IF NOT EXISTS ai_advices (
     CONSTRAINT fk_ai_project FOREIGN KEY (project_id) REFERENCES projects(id)
 ) COMMENT='AI 建议与草稿表';
 
+CREATE TABLE IF NOT EXISTS ai_settings (
+    id VARCHAR(64) PRIMARY KEY COMMENT 'AI 设置 ID',
+    user_id VARCHAR(64) NOT NULL COMMENT '所属用户 ID',
+    provider VARCHAR(32) NOT NULL COMMENT 'AI 提供商：OPENAI/DEEPSEEK/MIMO',
+    encrypted_key VARCHAR(1024) NOT NULL COMMENT 'AES-GCM 加密后的 API Key（Base64）',
+    is_custom TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否用户自带 Key（BYOK）',
+    masked_key VARCHAR(64) NULL COMMENT '脱敏展示用 Key',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uk_ai_settings_user_provider (user_id, provider),
+    CONSTRAINT fk_ai_settings_user FOREIGN KEY (user_id) REFERENCES users(id)
+) COMMENT='AI BYOK 加密设置表';
+
 CREATE TABLE IF NOT EXISTS sync_records (
     id VARCHAR(64) PRIMARY KEY COMMENT '同步记录 ID',
     user_id VARCHAR(64) NOT NULL DEFAULT 'legacy' COMMENT '所属用户 ID',
