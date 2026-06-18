@@ -1,4 +1,17 @@
-import { CheckCircle, TrendingUp, Clock, BarChart3 } from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { IconCheckCircle, IconClock, IconRefresh, IconStats, IconTasks } from "../components/icons";
+import { Badge, Button, Card, CardHeader, EmptyState, PageHeader, SkeletonList, StateMessage, StatCard } from "../components/ui";
 import { useStats } from "../hooks/useStats";
 
 function formatDateLabel(dateStr: string): string {
@@ -6,210 +19,200 @@ function formatDateLabel(dateStr: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-function BarChart({ data }: { data: Array<{ date: string; minutes: number }> }) {
-  const max = Math.max(...data.map((d) => d.minutes), 1);
+const chartColors = [
+  "var(--accent)",
+  "var(--success)",
+  "var(--warning)",
+  "var(--danger)",
+  "var(--info)",
+  "var(--habit)",
+];
 
-  return (
-    <div className="chart-bar" role="img" aria-label="7天学习时长趋势">
-      <div className="chart-bar-bars">
-        {data.map((item) => {
-          const heightPct = (item.minutes / max) * 100;
-          return (
-            <div key={item.date} className="chart-bar-item">
-              <div
-                className="chart-bar-fill"
-                style={{ height: `${heightPct}%` }}
-                title={`${formatDateLabel(item.date)}: ${item.minutes} 分钟`}
-              />
-              <span className="chart-bar-label">{formatDateLabel(item.date)}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function PieChart({
-  data,
-}: {
-  data: Array<{ projectName: string; minutes: number }>;
-}) {
-  const total = data.reduce((sum, d) => sum + d.minutes, 0);
-  if (total === 0) return null;
-
-  const colors = [
-    "#4A7DFF",
-    "#52C41A",
-    "#FAAD14",
-    "#FF4D4F",
-    "#1890FF",
-    "#722ED1",
-  ];
-
-  let cumulative = 0;
-  const slices = data.map((item, i) => {
-    const pct = item.minutes / total;
-    const start = cumulative;
-    cumulative += pct;
-    return {
-      ...item,
-      start,
-      end: cumulative,
-      color: colors[i % colors.length],
-    };
-  });
-
-  return (
-    <div className="chart-pie-wrap" role="img" aria-label="项目时间分布">
-      <svg viewBox="0 0 100 100" className="chart-pie">
-        {slices.map((slice, i) => {
-          const startAngle = slice.start * 360 - 90;
-          const endAngle = slice.end * 360 - 90;
-          const startRad = (startAngle * Math.PI) / 180;
-          const endRad = (endAngle * Math.PI) / 180;
-          const x1 = 50 + 40 * Math.cos(startRad);
-          const y1 = 50 + 40 * Math.sin(startRad);
-          const x2 = 50 + 40 * Math.cos(endRad);
-          const y2 = 50 + 40 * Math.sin(endRad);
-          const largeArc = slice.end - slice.start > 0.5 ? 1 : 0;
-          return (
-            <path
-              key={i}
-              d={`M 50 50 L ${x1} ${y1} A 40 40 0 ${largeArc} 1 ${x2} ${y2} Z`}
-              fill={slice.color}
-              stroke="var(--panel)"
-              strokeWidth="1"
-            />
-          );
-        })}
-      </svg>
-      <div className="chart-pie-legend">
-        {slices.map((slice, i) => (
-          <div key={i} className="chart-legend-item">
-            <span className="chart-legend-dot" style={{ background: slice.color }} />
-            <span className="chart-legend-name">{slice.projectName}</span>
-            <span className="chart-legend-value">
-              {Math.round((slice.minutes / total) * 100)}%
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+const tooltipStyle = {
+  border: "1px solid var(--line)",
+  borderRadius: 8,
+  background: "var(--panel)",
+  color: "var(--text)",
+  boxShadow: "var(--shadow-soft)",
+};
 
 export function StatsPage() {
   const { stats, loading, error, cached, refresh } = useStats();
 
-  const hasData = stats && (stats.totalCompleted > 0 || stats.dailyMinutes.some((d) => d.minutes > 0));
+  const totalMinutes = stats?.dailyMinutes.reduce((sum, day) => sum + day.minutes, 0) ?? 0;
+  const hasData =
+    stats !== null &&
+    (stats.totalCompleted > 0 ||
+      stats.dailyMinutes.some((day) => day.minutes > 0) ||
+      stats.projectDistribution.some((project) => project.minutes > 0));
+  const trendData = stats?.dailyMinutes.map((day) => ({
+    ...day,
+    label: formatDateLabel(day.date),
+  })) ?? [];
+  const projectData = stats?.projectDistribution ?? [];
 
   return (
-    <section className="page-stack">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">Statistics</p>
-          <h1>学习数据看板</h1>
-        </div>
-        <div className="panel-actions">
-          {cached && (
-            <span className="badge orange" aria-label="离线缓存">
-              离线缓存
-            </span>
-          )}
-          <button className="btn-secondary" onClick={refresh} disabled={loading}>
-            刷新
-          </button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Statistics"
+        title="学习统计"
+        description="追踪本周完成数、学习时长和项目投入分布。"
+        actions={
+          <>
+            {cached && (
+              <Badge tone="warning" dot aria-label="离线缓存">
+                离线缓存
+              </Badge>
+            )}
+            <Button variant="secondary" size="sm" onClick={refresh} disabled={loading}>
+              <IconRefresh size={15} className={loading ? "animate-spin" : undefined} />
+              刷新
+            </Button>
+          </>
+        }
+      />
 
-      {loading && !stats && <div className="state-message">加载中…</div>}
+      {loading && !stats && <SkeletonList rows={4} />}
 
-      {error && !stats && (
-        <div className="state-message state-failure" role="alert">
-          加载失败：{error}
-        </div>
-      )}
+      {error && !stats && <StateMessage kind="error">加载失败：{error}</StateMessage>}
 
       {!loading && !error && !hasData && (
-        <div className="state-message state-empty">
-          暂无学习记录/任务完成记录，去「学习日志」或「任务管理」开始记录吧。
-        </div>
+        <EmptyState
+          icon={IconStats}
+          title="暂无统计数据"
+          description="完成任务或记录学习时间后，这里会出现趋势和分布。"
+        />
       )}
 
       {hasData && stats && (
         <>
-          {/* 核心指标 */}
-          <div className="metric-grid" aria-label="核心指标">
-            <article className="metric-card">
-              <div className="metric-icon green">
-                <CheckCircle size={22} />
-              </div>
-              <div className="metric-content">
-                <strong>{stats.totalCompleted}</strong>
-                <span>本周完成数</span>
-              </div>
-            </article>
-            <article className="metric-card">
-              <div className="metric-icon blue">
-                <TrendingUp size={22} />
-              </div>
-              <div className="metric-content">
-                <strong>{stats.completionRate}%</strong>
-                <span>完成率</span>
-              </div>
-            </article>
-            <article className="metric-card">
-              <div className="metric-icon cyan">
-                <Clock size={22} />
-              </div>
-              <div className="metric-content">
-                <strong>
-                  {Math.round(
-                    stats.dailyMinutes.reduce((s, d) => s + d.minutes, 0) / 60
-                  )}
-                  h
-                </strong>
-                <span>总学习时长</span>
-              </div>
-            </article>
-            <article className="metric-card">
-              <div className="metric-icon orange">
-                <BarChart3 size={22} />
-              </div>
-              <div className="metric-content">
-                <strong>{stats.projectDistribution.length}</strong>
-                <span>活跃项目</span>
-              </div>
-            </article>
+          <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              icon={IconCheckCircle}
+              label="本周完成数"
+              value={stats.totalCompleted}
+              tone="success"
+            />
+            <StatCard
+              icon={IconStats}
+              label="完成率"
+              value={stats.completionRate}
+              suffix="%"
+              tone="brand"
+            />
+            <StatCard
+              icon={IconClock}
+              label="总学习时长"
+              value={Math.round(totalMinutes / 60)}
+              suffix="h"
+              tone="focus"
+              hint={`${totalMinutes} 分钟`}
+            />
+            <StatCard
+              icon={IconTasks}
+              label="活跃项目"
+              value={projectData.length}
+              tone="warning"
+            />
           </div>
 
-          {/* 图表区域 */}
-          <div className="content-grid">
-            <section className="panel">
-              <div className="panel-heading">
-                <h2>7 天学习时长趋势</h2>
-              </div>
-              {stats.dailyMinutes.length > 0 ? (
-                <BarChart data={stats.dailyMinutes} />
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+            <Card>
+              <CardHeader
+                title="7 天学习时长趋势"
+                subtitle="按天汇总的专注与日志分钟数"
+                action={<Badge tone="brand">{totalMinutes} 分钟</Badge>}
+              />
+              {trendData.length > 0 ? (
+                <div className="h-[280px] w-full" role="img" aria-label="7 天学习时长趋势">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={trendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="minutesFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.28} />
+                          <stop offset="95%" stopColor="var(--accent)" stopOpacity={0.04} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid stroke="var(--line)" strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fill: "var(--muted)", fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "var(--muted)", fontSize: 12 }} axisLine={false} tickLine={false} width={36} />
+                      <Tooltip
+                        contentStyle={tooltipStyle}
+                        labelStyle={{ color: "var(--muted)" }}
+                        formatter={(value) => [`${value} 分钟`, "学习时长"]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="minutes"
+                        stroke="var(--accent)"
+                        strokeWidth={2.4}
+                        fill="url(#minutesFill)"
+                        activeDot={{ r: 4, fill: "var(--accent)" }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               ) : (
-                <div className="state-message state-empty">暂无趋势数据</div>
+                <EmptyState icon={IconClock} title="暂无趋势数据" compact />
               )}
-            </section>
+            </Card>
 
-            <section className="panel">
-              <div className="panel-heading">
-                <h2>项目时间分布</h2>
-              </div>
-              {stats.projectDistribution.length > 0 ? (
-                <PieChart data={stats.projectDistribution} />
+            <Card>
+              <CardHeader
+                title="项目时间分布"
+                subtitle="按项目汇总本周投入"
+                action={<Badge tone="neutral">{projectData.length} 项</Badge>}
+              />
+              {projectData.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-1 2xl:grid-cols-[220px_minmax(0,1fr)]">
+                  <div className="h-[220px] min-w-0" role="img" aria-label="项目时间分布">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={projectData}
+                          dataKey="minutes"
+                          nameKey="projectName"
+                          innerRadius={52}
+                          outerRadius={82}
+                          paddingAngle={2}
+                        >
+                          {projectData.map((entry, index) => (
+                            <Cell key={entry.projectId} fill={chartColors[index % chartColors.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={tooltipStyle}
+                          formatter={(value, name) => [`${value} 分钟`, name]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="space-y-2">
+                    {projectData.map((project, index) => (
+                      <div
+                        key={project.projectId}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                            style={{ background: chartColors[index % chartColors.length] }}
+                          />
+                          <span className="truncate text-[0.84rem] font-medium text-ink">{project.projectName}</span>
+                        </div>
+                        <span className="shrink-0 text-[0.82rem] text-muted">{project.minutes} 分钟</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ) : (
-                <div className="state-message state-empty">暂无分布数据</div>
+                <EmptyState icon={IconTasks} title="暂无分布数据" compact />
               )}
-            </section>
+            </Card>
           </div>
         </>
       )}
-    </section>
+    </div>
   );
 }
