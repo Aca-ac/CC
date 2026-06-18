@@ -66,6 +66,63 @@ export interface CreateHabitRequest {
   ruleText?: string;
 }
 
+// ── AI breakdown / advice / settings ─────────────────────────
+export interface BreakdownTaskDraft {
+  title: string;
+  description: string;
+  estimatedMinutes: number;
+  priority: string;
+}
+
+export interface BreakdownStage {
+  title: string;
+  tasks: BreakdownTaskDraft[];
+}
+
+export interface BreakdownTree {
+  draftId: string;
+  goal: string;
+  weeks: number;
+  stages: BreakdownStage[];
+}
+
+export interface CommitTaskNode {
+  parentTaskId?: string | null;
+  title: string;
+  description: string;
+  estimatedMinutes: number;
+  priority: string;
+  subtasks?: CommitTaskNode[];
+}
+
+export interface BreakdownCommitPayload {
+  draftId: string;
+  projectId: string;
+  tasks: CommitTaskNode[];
+}
+
+export interface WeeklyAdvice {
+  adviceId: string;
+  title: string;
+  content: string;
+  type: string;
+  generatedAt: string;
+}
+
+export interface AiSettingsItem {
+  id: string;
+  provider: string;
+  isCustom: boolean;
+  maskedKey: string;
+  updatedAt: string;
+}
+
+export interface UpdateAiSettingsPayload {
+  provider: string;
+  apiKey: string;
+  isCustom: boolean;
+}
+
 const API_URL_KEY = "chronos:apiUrl";
 const TOKEN_KEY = "chronos:session";
 
@@ -124,9 +181,6 @@ export const apiClient = {
   getTodayDashboard: () => request<DashboardSummary>("/dashboard/today"),
   listProjects: () => request<Project[]>("/projects"),
   listTasks: () => request<Task[]>("/tasks"),
-  // TODO(前后端联调): AI 接口必须返回草稿结构，前端确认前不能直接创建正式任务。
-  previewAiBreakdown: (payload: { goal: string; weeks: number }) =>
-    request<unknown>("/ai/breakdown-preview", { method: "POST", body: JSON.stringify(payload) }),
 
   // ── Timer ────────────────────────────────────────────────────
   getActiveTimer: () => request<ActiveTimerResponse | null>("/timer/active"),
@@ -144,9 +198,23 @@ export const apiClient = {
     projectDistribution: Array<{ projectId: string; projectName: string; minutes: number }>;
   }>("/stats/weekly"),
 
-  getAiAdvice: () => request<{
-    items: Array<{ type: string; title: string; content: string }>;
-  }>("/ai/advice"),
+  // ── AI（FR-AI 拆解 / UC-AI；BYOK 服务端加密存储）────────────
+  aiBreakdownPreview: (payload: { goal: string; weeks: number; projectId?: string }) =>
+    request<BreakdownTree>("/ai/breakdown/preview", { method: "POST", body: JSON.stringify(payload) }),
+  aiBreakdownCommit: (payload: BreakdownCommitPayload) =>
+    request<{ createdTasks: number; projectId: string }>("/ai/breakdown/commit", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  aiAdvice: (projectId?: string) =>
+    request<WeeklyAdvice>(`/ai/advice${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""}`, {
+      method: "POST",
+    }),
+  listAiSettings: () => request<AiSettingsItem[]>("/ai/settings"),
+  updateAiSettings: (payload: UpdateAiSettingsPayload) =>
+    request<AiSettingsItem>("/ai/settings", { method: "PUT", body: JSON.stringify(payload) }),
+  deleteAiSettings: (provider: string) =>
+    request<void>(`/ai/settings/key/${encodeURIComponent(provider)}`, { method: "DELETE" }),
 
   syncPush: (records: SyncRecordItem[]) =>
     request<{ accepted: number; conflicts: Array<{ id: string; entityType: string; entityId: string; clientPayload: unknown; serverPayload: unknown }> }>("/sync/push", { method: "POST", body: JSON.stringify({ records }) }),

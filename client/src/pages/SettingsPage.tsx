@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   IconAi,
-  IconAlert,
   IconCheck,
   IconRefresh,
   IconSettings,
@@ -22,14 +21,7 @@ import {
 } from "../components/ui";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
-import { apiClient } from "../services/apiClient";
-import {
-  isPublicHttp,
-  loadAiSettings,
-  maskKey,
-  saveAiSettings,
-  type AiSettings,
-} from "../services/aiService";
+import { apiClient, type AiSettingsItem } from "../services/apiClient";
 import {
   CURRENT_APP_VERSION,
   checkForUpdates,
@@ -37,52 +29,48 @@ import {
   type UpdateCheckResult,
 } from "../services/updateService";
 
-const PROVIDER_PRESETS = [
-  { label: "服务端默认", value: "server", baseUrl: "", model: "gpt-4o-mini" },
-  { label: "OpenAI", value: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
-  {
-    label: "Azure OpenAI",
-    value: "azure",
-    baseUrl: "https://{your-resource}.openai.azure.com/openai/deployments/{deployment}",
-    model: "gpt-4o",
-  },
-  { label: "DeepSeek", value: "deepseek", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
-  {
-    label: "SiliconFlow",
-    value: "siliconflow",
-    baseUrl: "https://api.siliconflow.cn/v1",
-    model: "deepseek-ai/DeepSeek-V3",
-  },
-  { label: "自定义", value: "custom", baseUrl: "", model: "" },
+// 后端 AiProviderFactory 支持的 provider；Key 以大写 provider 名加密存储，
+// 各 provider 的 endpoint/model 由服务端部署配置决定。
+const AI_PROVIDERS = [
+  { code: "OPENAI", label: "OpenAI 兼容" },
+  { code: "DEEPSEEK", label: "DeepSeek" },
+  { code: "MIMO", label: "MiMo" },
 ];
 
-function providerValue(settings: AiSettings): string {
-  if (settings.mode === "server") return "server";
-
-  const matchedPreset = PROVIDER_PRESETS.find(
-    (preset) =>
-      preset.value !== "server" &&
-      preset.value !== "custom" &&
-      preset.baseUrl === settings.baseUrl &&
-      preset.model === settings.model
-  );
-
-  return matchedPreset?.value ?? "custom";
-}
-
 export function SettingsPage() {
-  const { apiBaseUrl, setApiBaseUrl, offline } = useAuth();
+  const { apiBaseUrl, setApiBaseUrl, offline, session } = useAuth();
   const { theme } = useTheme();
   const [urlInput, setUrlInput] = useState(apiBaseUrl);
   const [healthStatus, setHealthStatus] = useState<string | null>(null);
   const [healthKind, setHealthKind] = useState<"info" | "error">("info");
   const [healthLoading, setHealthLoading] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
-  const [aiSettings, setAiSettings] = useState<AiSettings>(() => loadAiSettings());
+
+  const [aiProvider, setAiProvider] = useState("OPENAI");
   const [keyInput, setKeyInput] = useState("");
+  const [aiSettings, setAiSettings] = useState<AiSettingsItem[]>([]);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+
+  const aiManageable = Boolean(session) && !offline;
+
+  const refreshAiSettings = useCallback(async () => {
+    if (!aiManageable) return;
+    try {
+      const list = await apiClient.listAiSettings();
+      setAiSettings(list ?? []);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : String(err));
+    }
+  }, [aiManageable]);
+
+  useEffect(() => {
+    refreshAiSettings();
+  }, [refreshAiSettings]);
 
   const flash = (message: string) => {
     setSaveMsg(message);
@@ -115,48 +103,40 @@ export function SettingsPage() {
     }
   };
 
-  const handlePresetChange = (value: string) => {
-    const preset = PROVIDER_PRESETS.find((item) => item.value === value);
-    if (!preset) return;
+  const currentMaskedKey = aiSettings.find((item) => item.provider === aiProvider)?.maskedKey ?? null;
 
-    setAiSettings({
-      mode: value === "server" ? "server" : "custom",
-      baseUrl: preset.baseUrl,
-      model: preset.model,
-      apiKey: aiSettings.apiKey,
-    });
-  };
-
-  const pendingKey = keyInput.trim() || aiSettings.apiKey;
-  const aiUsesCustom = aiSettings.mode === "custom";
-  const publicHttpWarning = aiUsesCustom && isPublicHttp(aiSettings.baseUrl);
-  const publicHttpBlocked = publicHttpWarning && pendingKey.length > 0;
-
-  const handleSaveAi = () => {
-    if (publicHttpBlocked) {
-      flash("公开 HTTP 地址不能保存自带 API Key。");
+  const handleSaveAi = async () => {
+    const key = keyInput.trim();
+    if (key.length < 8) {
+      setAiError("API Key 至少需要 8 个字符。");
       return;
     }
-
-    const next: AiSettings = {
-      ...aiSettings,
-      baseUrl: aiSettings.baseUrl.trim(),
-      model: aiSettings.model.trim() || "gpt-4o-mini",
-      apiKey: pendingKey,
-    };
-
-    saveAiSettings(next);
-    setAiSettings(next);
-    setKeyInput("");
-    flash("AI 设置已保存");
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      await apiClient.updateAiSettings({ provider: aiProvider, apiKey: key, isCustom: true });
+      setKeyInput("");
+      await refreshAiSettings();
+      flash("AI Key 已加密保存到服务端");
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiBusy(false);
+    }
   };
 
-  const handleClearKey = () => {
-    const next = { ...aiSettings, apiKey: "" };
-    saveAiSettings(next);
-    setAiSettings(next);
-    setKeyInput("");
-    flash("本地 API Key 已清除");
+  const handleClearKey = async () => {
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      await apiClient.deleteAiSettings(aiProvider);
+      await refreshAiSettings();
+      flash("已删除该 provider 的 Key");
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiBusy(false);
+    }
   };
 
   const handleCheckUpdates = async () => {
@@ -175,8 +155,6 @@ export function SettingsPage() {
   const handleOpenRelease = async () => {
     await openReleasePage(updateResult?.releaseUrl ?? "https://github.com/Vincent-Ctrl-18/Chronos/releases");
   };
-
-  const selectedProvider = providerValue(aiSettings);
 
   return (
     <div className="space-y-5">
@@ -240,11 +218,11 @@ export function SettingsPage() {
 
       <Card>
         <CardHeader
-          title="AI 服务"
-          subtitle="支持 OpenAI 兼容接口；自带 Key 只保存在本机，并会拒绝公开 HTTP 地址。"
+          title="AI 服务（BYOK）"
+          subtitle="自带 Key 经服务端 AES-GCM 加密保存；未配置时后端使用内置 Mock。"
           action={
-            aiSettings.apiKey ? (
-              <Badge tone="success">{maskKey(aiSettings.apiKey)}</Badge>
+            currentMaskedKey ? (
+              <Badge tone="success">{currentMaskedKey}</Badge>
             ) : (
               <Badge tone="neutral">未配置 Key</Badge>
             )
@@ -252,45 +230,44 @@ export function SettingsPage() {
         />
         <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)]">
           <div className="space-y-3">
-            <Field label="Provider preset">
-              <Select value={selectedProvider} onChange={(event) => handlePresetChange(event.target.value)}>
-                {PROVIDER_PRESETS.map((preset) => (
-                  <option key={preset.value} value={preset.value}>
-                    {preset.label}
+            <Field label="Provider">
+              <Select value={aiProvider} onChange={(event) => setAiProvider(event.target.value)}>
+                {AI_PROVIDERS.map((provider) => (
+                  <option key={provider.code} value={provider.code}>
+                    {provider.label}
                   </option>
                 ))}
               </Select>
             </Field>
 
-            <Field label="Base URL" hint={aiUsesCustom ? "必须是 OpenAI 兼容的 /v1 入口。" : "服务端默认模式无需本机配置。"}>
-              <Input
-                type="text"
-                value={aiSettings.baseUrl}
-                onChange={(event) => setAiSettings({ ...aiSettings, baseUrl: event.target.value })}
-                placeholder="https://api.openai.com/v1"
-                disabled={!aiUsesCustom}
-              />
-            </Field>
-
-            <Field label="Model">
-              <Input
-                type="text"
-                value={aiSettings.model}
-                onChange={(event) => setAiSettings({ ...aiSettings, model: event.target.value })}
-                placeholder="gpt-4o-mini"
-                disabled={!aiUsesCustom}
-              />
-            </Field>
-
-            <Field label="API Key" hint={aiSettings.apiKey ? "留空保存会继续使用当前 Key。" : "仅自定义提供商需要填写。"}>
+            <Field
+              label="API Key"
+              hint={currentMaskedKey ? `当前已配置：${currentMaskedKey}` : "仅在线登录后可配置（HTTPS 环境）。"}
+            >
               <Input
                 type="password"
                 value={keyInput}
                 onChange={(event) => setKeyInput(event.target.value)}
-                placeholder={aiSettings.apiKey ? "保持当前 Key" : "sk-..."}
-                disabled={!aiUsesCustom}
+                placeholder="sk-..."
+                disabled={!aiManageable || aiBusy}
+                aria-label="AI API Key"
               />
             </Field>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={handleSaveAi} disabled={!aiManageable || aiBusy}>
+                <IconCheck size={15} />
+                保存 Key
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleClearKey}
+                disabled={!aiManageable || aiBusy || !currentMaskedKey}
+              >
+                <IconTrash size={15} />
+                删除 Key
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -300,30 +277,18 @@ export function SettingsPage() {
                 <div className="min-w-0">
                   <p className="text-[0.9rem] font-medium text-ink">调用策略</p>
                   <p className="mt-1 text-[0.82rem] leading-relaxed text-muted">
-                    拆解与复盘会优先使用这里的 OpenAI 兼容配置；未配置时回到服务端默认提供商。
+                    拆解与复盘优先使用所选 provider 的加密 Key；服务端按部署配置选择启用的 provider，
+                    无可用 Key 时回落内置 Mock，核心流程不受影响。
                   </p>
                 </div>
               </div>
             </div>
 
-            {publicHttpWarning && (
-              <StateMessage kind="error">
-                当前自定义地址使用公开 HTTP。请改用 HTTPS 后再保存 API Key。
-              </StateMessage>
+            {!aiManageable && (
+              <StateMessage>登录在线后可配置 AI Key（Key 加密存储于服务端，不写入本机）。</StateMessage>
             )}
-
+            {aiError && <StateMessage kind="error">{aiError}</StateMessage>}
             {saveMsg && <StateMessage>{saveMsg}</StateMessage>}
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={handleSaveAi} disabled={publicHttpBlocked}>
-                <IconCheck size={15} />
-                保存 AI 设置
-              </Button>
-              <Button variant="secondary" onClick={handleClearKey} disabled={!aiSettings.apiKey}>
-                <IconTrash size={15} />
-                清除本地 Key
-              </Button>
-            </div>
           </div>
         </div>
       </Card>
@@ -348,11 +313,7 @@ export function SettingsPage() {
                 </Button>
               )}
             </div>
-            {updateResult && (
-              <StateMessage kind={updateResult.status === "available" ? "info" : "info"}>
-                {updateResult.message}
-              </StateMessage>
-            )}
+            {updateResult && <StateMessage kind="info">{updateResult.message}</StateMessage>}
             {updateError && <StateMessage kind="error">{updateError}</StateMessage>}
           </div>
         </Card>
@@ -379,13 +340,6 @@ export function SettingsPage() {
           </div>
         </Card>
       </div>
-
-      {publicHttpBlocked && (
-        <StateMessage kind="error">
-          <IconAlert size={16} />
-          公开 HTTP 地址不能与本地 API Key 同时保存。
-        </StateMessage>
-      )}
     </div>
   );
 }

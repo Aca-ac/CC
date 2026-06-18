@@ -6,12 +6,14 @@ import { AiBreakdownPage } from "../AiBreakdownPage";
 const aiMocks = vi.hoisted(() => ({
   previewBreakdown: vi.fn(),
   commitBreakdown: vi.fn(),
+  generateAdvice: vi.fn(),
 }));
 
 vi.mock("../../services/aiService", () => ({
   aiService: {
     previewBreakdown: aiMocks.previewBreakdown,
     commitBreakdown: aiMocks.commitBreakdown,
+    generateAdvice: aiMocks.generateAdvice,
   },
 }));
 
@@ -29,30 +31,19 @@ describe("AiBreakdownPage", () => {
     aiMocks.commitBreakdown.mockReset();
   });
 
-  it("renders redesigned AI breakdown preview from mocked service response", async () => {
+  it("renders the stage-tree breakdown preview from the structured endpoint", async () => {
     aiMocks.previewBreakdown.mockResolvedValue({
-      projectName: "React 学习计划",
+      draftId: "draft-1",
       goal: "掌握 React",
-      phases: [
+      weeks: 4,
+      stages: [
         {
-          name: "基础",
-          weeks: 2,
+          title: "基础阶段",
           tasks: [
-            {
-              title: "阅读 React 文档",
-              description: "完成核心概念复盘",
-              estimatedMinutes: 120,
-              priority: "HIGH",
-            },
+            { title: "阅读 React 文档", description: "完成核心概念复盘", estimatedMinutes: 120, priority: "HIGH" },
           ],
         },
       ],
-      firstAction: {
-        title: "阅读 React 文档",
-        description: "完成核心概念复盘",
-        estimatedMinutes: 120,
-        priority: "HIGH",
-      },
     });
 
     renderAiBreakdown();
@@ -61,14 +52,14 @@ describe("AiBreakdownPage", () => {
       expect(screen.getByText("AI 拆解工作台")).toBeDefined();
     });
 
-    fireEvent.change(screen.getByLabelText("目标描述"), {
-      target: { value: "掌握 React" },
-    });
+    fireEvent.change(screen.getByLabelText("目标描述"), { target: { value: "掌握 React" } });
     fireEvent.click(screen.getByText("生成草稿"));
 
     await waitFor(() => {
-      expect(screen.getAllByText("阅读 React 文档").length).toBeGreaterThan(0);
+      expect(screen.getByText("基础阶段")).toBeDefined();
     });
-    expect(aiMocks.previewBreakdown).toHaveBeenCalledWith("掌握 React", 4);
+    expect(screen.getAllByDisplayValue("阅读 React 文档").length).toBeGreaterThan(0);
+    // 目标 + 周期 + 目标项目（无项目时传 undefined）
+    expect(aiMocks.previewBreakdown).toHaveBeenCalledWith("掌握 React", 4, undefined);
   });
 });
