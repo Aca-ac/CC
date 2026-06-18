@@ -86,3 +86,10 @@
 - 改动目的：完成项目收尾的第 1 阶段——合并并加固未合并的后端 PR、把 AI 泛化为 OpenAI 兼容协议、吸收前端同步逻辑的缺失部分、让此前被禁用的 CI 检查真正运行并通过。
 - 验证结果：`./server/mvnw verify` 全绿（56 项测试，JaCoCo 覆盖率报告生成）；`npx vitest run`（client）全绿（12 文件 / 38 测试）；`.github/workflows/ci.yml` 通过 `yaml.safe_load` 校验且三个 job 均已启用。
 - 待办（后续阶段）：sync 模块的用户隔离（push 未写 userId、controller 无鉴权）留待阶段 3 鉴权接入时统一处理；前端计时器测试使用真实 `setTimeout`（整套约 3-4 分钟），建议阶段 2 改用 fake timers 提速。
+
+## 2026-06-18 收尾阶段 2（UI 全量重写 + PWA）
+
+- 改动文件：`client/src/styles/global.css`、`client/src/components/icons/`、`client/src/components/ui/`、`client/src/components/AppLayout.tsx`、`client/src/components/ConflictDialog.tsx`、`client/src/pages/{DashboardPage,ProjectsPage,TasksPage,CalendarPage,LearningLogsPage,AiBreakdownPage,StatsPage,SettingsPage,LoginPage,RegisterPage}.tsx`、相关页面/组件测试、`client/vite.config.ts`、`client/index.html`、`client/package.json`、`package-lock.json`、`client/public/icons/chronos-{192,512}.png`。
+- 改动目的：完成阶段 2 UI 全量重写：Tailwind v4 CSS-first 设计系统、手绘 SVG 图标、紧凑圆角、高密度卡片、深浅主题、图标轨侧栏、主要页面改造、登录/注册改造、冲突弹窗改造，并加入可安装 PWA manifest 与 `vite-plugin-pwa` service worker。
+- 验证结果：`npm run build --workspace client` 通过，产出 `manifest.webmanifest`、`registerSW.js`、`sw.js`；`cd client && npx vitest run` 全绿（19 文件 / 48 测试）；`rg -n lucide-react client/src` 无匹配；`rg -n "auth-page|auth-card|auth-form|auth-submit|auth-offline|conflict-overlay|conflict-dialog|settings-list|page-stack|row-actions|update-card" client/src/pages client/src/components` 无匹配。
+- 已知限制：浏览器视觉 QA 受当前环境企业策略阻止，未声明已完成；StatsPage 的 Recharts 在 jsdom 测试中仍输出容器尺寸警告，但测试与构建通过。
