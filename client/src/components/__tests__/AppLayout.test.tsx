@@ -35,7 +35,7 @@ describe("AppLayout", () => {
     );
 
     expect(screen.getByLabelText("主导航")).toBeTruthy();
-    expect(screen.getByLabelText("Chronos 应用图标")).toBeTruthy();
+    expect(screen.getByText("Chronos")).toBeTruthy();
     expect(document.querySelector(".topbar")).toBeNull();
     expect(screen.queryByText("Chronos Scaffold")).toBeNull();
   });
