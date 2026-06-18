@@ -7,9 +7,11 @@ import {
   IconLogs,
   IconPlus,
   IconRefresh,
+  IconSearch,
   IconTimer,
   IconTrash,
 } from "../components/icons";
+import { MarkdownView } from "../components/MarkdownView";
 import {
   Badge,
   Button,
@@ -79,11 +81,23 @@ export function LearningLogsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [timerProjectId, setTimerProjectId] = useState("");
   const [timerTaskId, setTimerTaskId] = useState("");
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | "manual" | "timer">("all");
 
   const projectName = useMemo(() => new Map(projects.map((project) => [project.id, project.name])), [projects]);
   const taskTitle = useMemo(() => new Map(tasks.map((task) => [task.id, task.title])), [tasks]);
   const timerTasks = useMemo(() => tasks.filter((task) => task.projectId === timerProjectId), [tasks, timerProjectId]);
   const formTasks = useMemo(() => tasks.filter((task) => task.projectId === form.projectId), [form.projectId, tasks]);
+
+  const filteredLogs = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return logs.filter((log) => {
+      if (typeFilter !== "all" && log.type !== typeFilter) return false;
+      if (!q) return true;
+      const proj = (projectName.get(log.projectId) ?? "").toLowerCase();
+      return log.content.toLowerCase().includes(q) || proj.includes(q);
+    });
+  }, [logs, typeFilter, search, projectName]);
 
   const manualCount = logs.filter((log) => log.type === "manual").length;
   const timerCount = logs.filter((log) => log.type === "timer").length;
@@ -294,7 +308,32 @@ export function LearningLogsPage() {
       </Card>
 
       <Card>
-        <CardHeader title="日志时间线" subtitle="按创建时间倒序排列" action={<Badge tone="brand">{logs.length} 条</Badge>} />
+        <CardHeader title="日志时间线" subtitle="按创建时间倒序排列，支持 Markdown 渲染" action={<Badge tone="brand">{filteredLogs.length} 条</Badge>} />
+
+        <div className="mb-3 flex flex-wrap items-center gap-2.5">
+          <div className="relative min-w-[200px] flex-1">
+            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted">
+              <IconSearch size={15} />
+            </span>
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索日志内容或项目…"
+              className="pl-8"
+              aria-label="搜索日志"
+            />
+          </div>
+          <Select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as "all" | "manual" | "timer")}
+            aria-label="按类型筛选"
+            className="w-auto"
+          >
+            <option value="all">全部类型</option>
+            <option value="manual">手动日志</option>
+            <option value="timer">计时记录</option>
+          </Select>
+        </div>
 
         {loading && <SkeletonList rows={4} />}
         {error && <StateMessage kind="error">加载失败：{error}</StateMessage>}
@@ -312,10 +351,13 @@ export function LearningLogsPage() {
             compact
           />
         )}
+        {!loading && !error && logs.length > 0 && filteredLogs.length === 0 && (
+          <EmptyState icon={IconSearch} title="没有匹配的日志" description="试着调整搜索关键词或类型筛选。" compact />
+        )}
 
-        {!loading && logs.length > 0 && (
+        {!loading && filteredLogs.length > 0 && (
           <motion.ul variants={staggerContainer(0.035)} initial="hidden" animate="show" className="space-y-2.5">
-            {logs.map((log) => (
+            {filteredLogs.map((log) => (
               <motion.li key={log.id} variants={fadeUp}>
                 <div className="grid gap-3 rounded-lg border border-line bg-surface p-3 sm:grid-cols-[minmax(0,1fr)_auto]">
                   <div className="min-w-0">
@@ -327,7 +369,11 @@ export function LearningLogsPage() {
                       <Badge tone="neutral">{projectName.get(log.projectId) ?? log.projectId}</Badge>
                       {log.taskId && <Badge tone="neutral">{taskTitle.get(log.taskId) ?? log.taskId}</Badge>}
                     </div>
-                    <p className="line-clamp-3 text-[0.9rem] font-medium text-ink">{log.content}</p>
+                    {log.type === "manual" ? (
+                      <MarkdownView source={log.content} className="max-h-44 overflow-y-auto" />
+                    ) : (
+                      <p className="text-[0.9rem] font-medium text-ink">{log.content}</p>
+                    )}
                     {log.links && log.links.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {log.links.map((link) => (
@@ -365,8 +411,8 @@ export function LearningLogsPage() {
         open={isFormOpen}
         onClose={closeForm}
         title={editingId ? "编辑学习日志" : "手动录入学习日志"}
-        subtitle="本轮先使用纯文本编辑，Markdown 预览在后续增强任务接入。"
-        width={640}
+        subtitle="支持 Markdown：左侧编辑，右侧实时预览。"
+        width={760}
         footer={
           <>
             <Button variant="secondary" onClick={closeForm}>
@@ -412,14 +458,25 @@ export function LearningLogsPage() {
               ))}
             </Select>
           </Field>
-          <Field label="学习内容">
-            <Textarea
-              rows={4}
-              value={form.content}
-              onChange={(e) => setForm((prev) => ({ ...prev, content: e.target.value }))}
-              autoFocus
-            />
-          </Field>
+          <div className="grid gap-1.5">
+            <span className="text-[0.82rem] font-medium text-muted">学习内容（支持 Markdown）</span>
+            <div className="grid gap-2 md:grid-cols-2">
+              <Textarea
+                rows={9}
+                value={form.content}
+                onChange={(e) => setForm((prev) => ({ ...prev, content: e.target.value }))}
+                placeholder="支持 # 标题、**加粗**、- 列表、`代码`、> 引用 等语法"
+                autoFocus
+              />
+              <div className="min-h-[200px] max-h-[340px] overflow-y-auto rounded-md border border-line bg-surface px-3 py-2">
+                {form.content.trim() ? (
+                  <MarkdownView source={form.content} />
+                ) : (
+                  <p className="text-[0.82rem] text-muted">实时预览将显示在这里。</p>
+                )}
+              </div>
+            </div>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="学习时长（分钟）">
               <Input

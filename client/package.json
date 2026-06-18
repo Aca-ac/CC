@@ -15,9 +15,11 @@
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
+    "dompurify": "^3.4.11",
     "framer-motion": "^12.40.0",
     "idb": "^8.0.0",
     "lucide-react": "^0.468.0",
+    "marked": "^18.0.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.0",
