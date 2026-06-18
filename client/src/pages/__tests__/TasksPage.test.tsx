@@ -20,6 +20,9 @@ describe("TasksPage", () => {
       expect(screen.getByText(/暂无任务/)).toBeDefined();
     });
 
+    expect(screen.getByLabelText(/状态筛选/)).toBeDefined();
+    expect(screen.getByLabelText(/优先级筛选/)).toBeDefined();
+
     fireEvent.click(screen.getByText("新建任务"));
 
     fireEvent.change(screen.getByLabelText(/标题/), {
