@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { CalendarPage } from "../CalendarPage";
 import { deleteDB } from "../../storage/db";
@@ -47,5 +47,17 @@ describe("CalendarPage", () => {
     await waitFor(() => {
       expect(screen.getByText("线性代数复习")).toBeDefined();
     });
+  });
+
+  it("switches from week view to month view", async () => {
+    renderCalendar();
+
+    await waitFor(() => {
+      expect(screen.getByText("日历计划")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /月视图/ }));
+
+    expect(screen.getByText("月度安排")).toBeDefined();
   });
 });
