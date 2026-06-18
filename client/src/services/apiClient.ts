@@ -42,6 +42,30 @@ export interface TimerStopRequest {
   durationMinutes: number;
 }
 
+export interface HabitDTO {
+  id: string;
+  name: string;
+  ruleText: string;
+  streakCount: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HabitCheckinDTO {
+  id: string;
+  habitId: string;
+  checkedDate: string;
+  checkedAt: string;
+  note: string | null;
+  streakCount: number;
+}
+
+export interface CreateHabitRequest {
+  name: string;
+  ruleText?: string;
+}
+
 const API_URL_KEY = "chronos:apiUrl";
 const TOKEN_KEY = "chronos:session";
 
@@ -132,4 +156,16 @@ export const apiClient = {
 
   resolveConflict: (conflictId: string, payload: { resolution: "keep-local" | "keep-cloud" }) =>
     request<void>("/sync/resolve", { method: "POST", body: JSON.stringify({ id: conflictId, ...payload }) }),
+
+  // ── Habits (FR-习惯打卡 / UC-Habit) ──────────────────────────
+  listHabits: () => request<HabitDTO[]>("/habits"),
+  createHabit: (payload: CreateHabitRequest) =>
+    request<HabitDTO>("/habits", { method: "POST", body: JSON.stringify(payload) }),
+  deleteHabit: (habitId: string) =>
+    request<void>(`/habits/${habitId}`, { method: "DELETE" }),
+  checkinHabit: (habitId: string, payload?: { date?: string; note?: string }) =>
+    request<HabitCheckinDTO>(`/habits/${habitId}/checkin`, {
+      method: "POST",
+      body: JSON.stringify(payload ?? {}),
+    }),
 };

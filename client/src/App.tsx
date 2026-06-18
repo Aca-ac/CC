@@ -4,6 +4,7 @@ import {
   IconAi,
   IconCalendar,
   IconDashboard,
+  IconHabit,
   IconLogs,
   IconProjects,
   IconSettings,
@@ -14,6 +15,7 @@ import { useAuth } from "./hooks/useAuth";
 import { AiBreakdownPage } from "./pages/AiBreakdownPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { HabitsPage } from "./pages/HabitsPage";
 import { LearningLogsPage } from "./pages/LearningLogsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
@@ -27,9 +29,10 @@ const navigation: NavigationItem[] = [
   { path: "/projects", label: "学习项目", icon: IconProjects },
   { path: "/tasks", label: "任务管理", icon: IconTasks },
   { path: "/logs", label: "日志与计时", icon: IconLogs },
-  { path: "/calendar", label: "周视图", icon: IconCalendar },
+  { path: "/calendar", label: "日历", icon: IconCalendar },
   { path: "/ai", label: "AI 拆解", icon: IconAi },
   { path: "/stats", label: "统计复盘", icon: IconStats },
+  { path: "/habits", label: "习惯打卡", icon: IconHabit },
   { path: "/settings", label: "系统设置", icon: IconSettings },
 ];
 
@@ -74,6 +77,7 @@ export function App() {
                   <Route path="/calendar" element={<CalendarPage />} />
                   <Route path="/ai" element={<AiBreakdownPage />} />
                   <Route path="/stats" element={<StatsPage />} />
+                  <Route path="/habits" element={<HabitsPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                 </Routes>
               </AppLayout>
