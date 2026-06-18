@@ -21,6 +21,9 @@ public class AiProviderFactory {
     private final String mimoEndpoint;
     private final String mimoModel;
     private final String mimoApiKey;
+    private final String openaiEndpoint;
+    private final String openaiModel;
+    private final String openaiApiKey;
 
     public AiProviderFactory(
             AiSettingsService aiSettingsService,
@@ -31,7 +34,10 @@ public class AiProviderFactory {
             @Value("${chronos.ai.api-key:}") String deepseekApiKey,
             @Value("${chronos.ai.providers.mimo.endpoint:https://api.minimaxi.com}") String mimoEndpoint,
             @Value("${chronos.ai.providers.mimo.model:mimo-v2.5-pro}") String mimoModel,
-            @Value("${MIMO_API_KEY:}") String mimoApiKey) {
+            @Value("${MIMO_API_KEY:}") String mimoApiKey,
+            @Value("${chronos.ai.providers.openai.endpoint:https://api.openai.com}") String openaiEndpoint,
+            @Value("${chronos.ai.providers.openai.model:gpt-4o-mini}") String openaiModel,
+            @Value("${CHRONOS_AI_OPENAI_API_KEY:}") String openaiApiKey) {
         this.aiSettingsService = aiSettingsService;
         this.defaultProvider = defaultProvider;
         this.fallbackEnabled = fallbackEnabled;
@@ -41,6 +47,9 @@ public class AiProviderFactory {
         this.mimoEndpoint = mimoEndpoint;
         this.mimoModel = mimoModel;
         this.mimoApiKey = mimoApiKey;
+        this.openaiEndpoint = openaiEndpoint;
+        this.openaiModel = openaiModel;
+        this.openaiApiKey = openaiApiKey;
     }
 
     /**
@@ -62,6 +71,7 @@ public class AiProviderFactory {
         return switch (providerName.toLowerCase()) {
             case "deepseek" -> createDeepSeekProvider(userId);
             case "mimo" -> createMiMoProvider(userId);
+            case "openai" -> createOpenAiProvider(userId);
             default -> new MockProvider();
         };
     }
@@ -88,5 +98,15 @@ public class AiProviderFactory {
             return new MockProvider();
         }
         return new MiMoProvider(mimoEndpoint, mimoModel, key);
+    }
+
+    private AiProvider createOpenAiProvider(String userId) {
+        // 优先使用用户 BYOK
+        String userKey = aiSettingsService.getDecryptedKey(userId, "OPENAI");
+        String key = (userKey != null) ? userKey : openaiApiKey;
+        if (key == null || key.isBlank()) {
+            return new MockProvider();
+        }
+        return new OpenAiCompatibleProvider(openaiEndpoint, openaiModel, key);
     }
 }
