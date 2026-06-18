@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import type { Transition } from "framer-motion";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { cn } from "../lib/cn";
@@ -19,29 +20,48 @@ interface AppLayoutProps {
   children: React.ReactNode;
 }
 
-function SidebarContent({ navigation, onNavigate }: { navigation: NavigationItem[]; onNavigate?: () => void }) {
+function SidebarContent({
+  navigation,
+  onNavigate,
+  expanded = true,
+}: {
+  navigation: NavigationItem[];
+  onNavigate?: () => void;
+  expanded?: boolean;
+}) {
   const { session, offline, logout } = useAuth();
   const today = new Intl.DateTimeFormat("zh-CN", {
     month: "long",
     day: "numeric",
     weekday: "long",
   }).format(new Date());
+  const labelMotion = {
+    opacity: expanded ? 1 : 0,
+    x: expanded ? 0 : -6,
+  };
+  const labelTransition: Transition = { duration: 0.16, ease: [0.22, 1, 0.36, 1] };
 
   return (
-    <div className="flex h-full flex-col gap-5 p-3.5">
+    <div className={cn("flex h-full flex-col p-3.5", expanded ? "gap-5" : "gap-4")}>
       {/* Brand */}
-      <div className="flex items-center gap-2.5 px-2 pt-1">
+      <div className={cn("flex items-center pt-1", expanded ? "gap-2.5 px-2" : "justify-center px-0")}>
         <span
           className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-base font-bold text-white shadow-[0_3px_10px_rgba(79,70,229,0.35)]"
-          style={{ background: "linear-gradient(135deg, var(--accent), var(--focus))" }}
+          style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-strong))" }}
           aria-label="Chronos 应用图标"
         >
           C
         </span>
-        <div className="min-w-0 leading-tight">
+        <motion.div
+          initial={false}
+          animate={{ opacity: expanded ? 1 : 0, width: expanded ? 156 : 0 }}
+          transition={labelTransition}
+          className="min-w-0 overflow-hidden leading-tight"
+          aria-hidden={!expanded}
+        >
           <strong className="block text-[1.02rem] font-semibold text-ink">Chronos</strong>
           <span className="block text-[0.74rem] text-muted">学习任务管理</span>
-        </div>
+        </motion.div>
       </div>
 
       {/* Nav */}
@@ -53,26 +73,45 @@ function SidebarContent({ navigation, onNavigate }: { navigation: NavigationItem
               key={item.path}
               to={item.path}
               onClick={onNavigate}
-              className="relative flex h-10 items-center rounded-md px-3"
+              aria-label={item.label}
+              title={item.label}
+              className={({ isActive }) =>
+                cn(
+                  "relative flex h-10 items-center rounded-md transition-colors duration-150",
+                  expanded ? "justify-start px-3" : "justify-center px-0",
+                  !isActive && "hover:bg-panel-muted"
+                )
+              }
             >
               {({ isActive }) => (
                 <>
                   {isActive && (
                     <motion.span
                       layoutId="nav-active-pill"
-                      className="absolute inset-0 rounded-md shadow-[0_3px_10px_rgba(79,70,229,0.28)]"
-                      style={{ background: "linear-gradient(135deg, var(--accent), var(--focus))" }}
+                      className={cn(
+                        "absolute rounded-md shadow-[0_3px_10px_rgba(79,70,229,0.28)]",
+                        expanded ? "inset-0" : "left-1 top-1/2 h-9 w-9 -translate-y-1/2"
+                      )}
+                      style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-strong))" }}
                       transition={{ type: "spring", stiffness: 420, damping: 34 }}
                     />
                   )}
                   <span
                     className={cn(
-                      "relative z-10 flex items-center gap-3 text-[0.9rem] font-medium transition-colors duration-150",
+                      "relative z-10 flex min-w-0 items-center text-[0.9rem] font-medium transition-colors duration-150",
+                      expanded ? "gap-3" : "justify-center",
                       isActive ? "text-white" : "text-muted hover:text-ink"
                     )}
                   >
                     <Icon size={18} strokeWidth={2.1} />
-                    {item.label}
+                    <motion.span
+                      initial={false}
+                      animate={{ ...labelMotion, width: expanded ? 142 : 0 }}
+                      transition={labelTransition}
+                      className="overflow-hidden whitespace-nowrap"
+                    >
+                      {item.label}
+                    </motion.span>
                   </span>
                 </>
               )}
@@ -83,36 +122,68 @@ function SidebarContent({ navigation, onNavigate }: { navigation: NavigationItem
 
       {/* Bottom cluster */}
       <div className="mt-auto flex flex-col gap-3">
-        <div className="rounded-md border border-line bg-panel-muted px-3 py-2">
+        <motion.div
+          initial={false}
+          animate={{ opacity: expanded ? 1 : 0, height: expanded ? "auto" : 0 }}
+          transition={labelTransition}
+          className={cn(
+            "overflow-hidden rounded-md border border-line bg-panel-muted px-3 py-2",
+            !expanded && "pointer-events-none border-transparent px-0 py-0"
+          )}
+          aria-hidden={!expanded}
+        >
           <p className="text-[0.72rem] text-muted">{today}</p>
           <p className="mt-0.5 text-[0.8rem] font-medium text-brand">
             {offline ? "离线模式 · 本地优先" : "本地优先 · AI 可选"}
           </p>
-        </div>
+        </motion.div>
 
-        <SyncStatusChip />
+        <SyncStatusChip expanded={expanded} />
 
-        <div className="flex items-center gap-2">
+        <div className={cn("flex items-center", expanded ? "gap-2" : "flex-col gap-2")}>
           <ThemeToggle />
           {session ? (
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-panel px-2.5 py-1.5">
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">
+            <div
+              className={cn(
+                "flex min-w-0 items-center rounded-md border border-line bg-panel",
+                expanded ? "flex-1 gap-2 px-2.5 py-1.5" : "h-9 w-9 justify-center px-0 py-0"
+              )}
+              title={session.name}
+            >
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-brand-soft text-brand">
                 <IconUser size={15} />
               </span>
-              <span className="min-w-0 flex-1 truncate text-[0.82rem] text-ink">{session.name}</span>
-              <button
-                type="button"
-                onClick={logout}
-                title="登出"
-                aria-label="登出"
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-panel-muted hover:text-danger"
+              <motion.span
+                initial={false}
+                animate={{ ...labelMotion, width: expanded ? 86 : 0 }}
+                transition={labelTransition}
+                className="min-w-0 flex-1 truncate text-[0.82rem] text-ink"
               >
-                <IconLogout size={15} />
-              </button>
+                {session.name}
+              </motion.span>
+              {expanded && (
+                <button
+                  type="button"
+                  onClick={logout}
+                  title="登出"
+                  aria-label="登出"
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted transition-colors hover:bg-panel-muted hover:text-danger"
+                >
+                  <IconLogout size={15} />
+                </button>
+              )}
             </div>
           ) : (
-            <span className="flex-1 truncate rounded-md border border-dashed border-line px-3 py-2 text-[0.78rem] text-muted">
-              未登录 · 本地演示
+            <span
+              className={cn(
+                "rounded-md border border-dashed border-line text-[0.78rem] text-muted",
+                expanded
+                  ? "flex-1 truncate px-3 py-2"
+                  : "grid h-9 w-9 place-items-center px-0 py-0"
+              )}
+              title="未登录 · 本地演示"
+            >
+              {expanded ? "未登录 · 本地演示" : <IconUser size={16} />}
             </span>
           )}
         </div>
@@ -124,6 +195,7 @@ function SidebarContent({ navigation, onNavigate }: { navigation: NavigationItem
 export function AppLayout({ navigation, children }: AppLayoutProps) {
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [desktopSidebarExpanded, setDesktopSidebarExpanded] = useState(false);
 
   // 路由切换时关闭移动端抽屉
   useEffect(() => {
@@ -135,18 +207,39 @@ export function AppLayout({ navigation, children }: AppLayoutProps) {
       {/* 顶部极淡光晕——克制即可，避免「AI 渐变大背景」观感 */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-40 opacity-50"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-40 opacity-50 dark:opacity-0"
         style={{
           background:
             "radial-gradient(50% 100% at 16% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 72%)",
         }}
       />
 
-      <div className="relative z-10 grid h-full lg:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="relative z-10 grid h-full lg:grid-cols-[72px_minmax(0,1fr)]">
         {/* Desktop sidebar */}
-        <aside className="hidden border-r border-line bg-panel/80 backdrop-blur-sm lg:block">
-          <SidebarContent navigation={navigation} />
-        </aside>
+        <div className="relative hidden lg:block">
+          <motion.aside
+            data-testid="desktop-sidebar-rail"
+            data-expanded={desktopSidebarExpanded ? "true" : "false"}
+            aria-expanded={desktopSidebarExpanded}
+            className={cn(
+              "absolute left-0 top-0 z-30 h-full overflow-hidden border-r border-line bg-panel/90 backdrop-blur-sm",
+              desktopSidebarExpanded && "shadow-float"
+            )}
+            initial={false}
+            animate={{ width: desktopSidebarExpanded ? 248 : 72 }}
+            transition={{ type: "spring", stiffness: 420, damping: 38 }}
+            onMouseEnter={() => setDesktopSidebarExpanded(true)}
+            onMouseLeave={() => setDesktopSidebarExpanded(false)}
+            onFocus={() => setDesktopSidebarExpanded(true)}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setDesktopSidebarExpanded(false);
+              }
+            }}
+          >
+            <SidebarContent navigation={navigation} expanded={desktopSidebarExpanded} />
+          </motion.aside>
+        </div>
 
         {/* Main */}
         <div className="flex min-w-0 flex-col overflow-hidden">
@@ -209,7 +302,7 @@ export function AppLayout({ navigation, children }: AppLayoutProps) {
               >
                 <IconClose size={18} />
               </button>
-              <SidebarContent navigation={navigation} onNavigate={() => setDrawerOpen(false)} />
+              <SidebarContent navigation={navigation} onNavigate={() => setDrawerOpen(false)} expanded />
             </motion.aside>
           </motion.div>
         )}

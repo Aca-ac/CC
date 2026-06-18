@@ -98,29 +98,29 @@
 .dark {
   color-scheme: dark;
 
-  --surface: #0B0F1A;
-  --panel: #141A28;
-  --panel-muted: #1B2230;
-  --text: #E7EAF2;
-  --muted: #93A0B5;
-  --line: #262E3F;
+  --surface: #0E0E10;
+  --panel: #17171A;
+  --panel-muted: #202024;
+  --text: #ECECEE;
+  --muted: #9A9AA2;
+  --line: #2A2A2E;
 
   --accent: #6366F1;
   --accent-strong: #818CF8;
-  --accent-soft: #20264A;
+  --accent-soft: #23232A;
 
   --success: #34D399;
-  --success-soft: #11261F;
+  --success-soft: #1B241F;
   --warning: #FBBF24;
-  --warning-soft: #2A2110;
+  --warning-soft: #27231A;
   --danger: #F87171;
-  --danger-soft: #2A1517;
+  --danger-soft: #2A1C1E;
   --info: #60A5FA;
-  --info-soft: #13233D;
-  --focus: #A78BFA;
-  --focus-soft: #221A3A;
+  --info-soft: #1E232B;
+  --focus: #818CF8;
+  --focus-soft: #24242B;
   --habit: #FB923C;
-  --habit-soft: #2A1A10;
+  --habit-soft: #282016;
 
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.6);

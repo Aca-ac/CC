@@ -43,4 +43,23 @@ describe("AppLayout", () => {
     expect(document.querySelector(".topbar")).toBeNull();
     expect(screen.queryByText("Chronos Scaffold")).toBeNull();
   });
+
+  it("renders a desktop icon rail with accessible navigation labels", () => {
+    render(
+      <ThemeProvider>
+        <AuthContext.Provider value={authValue}>
+          <MemoryRouter initialEntries={["/dashboard"]}>
+            <AppLayout navigation={navigation}>
+              <section>
+                <h2>今日看板</h2>
+              </section>
+            </AppLayout>
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId("desktop-sidebar-rail").getAttribute("data-expanded")).toBe("false");
+    expect(screen.getByTitle("今日看板").getAttribute("aria-label")).toBe("今日看板");
+  });
 });

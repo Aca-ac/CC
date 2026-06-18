@@ -6,7 +6,13 @@ import { IconCheck, IconLoader, IconRefresh, IconUpload } from "./icons";
 /**
  * 侧栏底部的同步状态芯片：展示待同步数量与同步状态，点击触发一次完整同步。
  */
-export function SyncStatusChip({ className }: { className?: string }) {
+export function SyncStatusChip({
+  className,
+  expanded = true,
+}: {
+  className?: string;
+  expanded?: boolean;
+}) {
   const accountId = useAccountId();
   const { status, pending, syncNow } = useSync(accountId);
 
@@ -33,10 +39,12 @@ export function SyncStatusChip({ className }: { className?: string }) {
       type="button"
       onClick={() => void syncNow()}
       disabled={syncing}
-      title="点击立即同步"
+      title={`点击立即同步：${label}`}
+      aria-label={`同步状态：${label}`}
       className={cn(
-        "flex w-full items-center gap-2 rounded-md border border-line bg-panel-muted px-3 py-2 text-left text-[0.8rem]",
+        "flex w-full items-center rounded-md border border-line bg-panel-muted text-left text-[0.8rem]",
         "transition-colors duration-150 hover:border-brand disabled:opacity-70",
+        expanded ? "gap-2 px-3 py-2" : "h-9 justify-center px-0 py-0",
         className
       )}
     >
@@ -51,7 +59,7 @@ export function SyncStatusChip({ className }: { className?: string }) {
           <IconCheck size={15} />
         )}
       </span>
-      <span className={cn("flex-1 truncate font-medium", tone)}>{label}</span>
+      {expanded && <span className={cn("flex-1 truncate font-medium", tone)}>{label}</span>}
     </button>
   );
 }
