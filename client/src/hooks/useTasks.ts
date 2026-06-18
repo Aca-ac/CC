@@ -18,7 +18,25 @@ function toDomain(t: TaskValue): Task {
     dueTime: t.dueTime,
     estimatedMinutes: t.estimatedMinutes,
     tags: t.tags,
+    orderIndex: t.orderIndex,
   };
+}
+
+function orderValue(task: { orderIndex?: number; createdAt?: number }) {
+  return task.orderIndex ?? task.createdAt ?? Number.MAX_SAFE_INTEGER;
+}
+
+function sortTaskValues(values: TaskValue[]): TaskValue[] {
+  return [...values].sort((a, b) => orderValue(a) - orderValue(b) || a.createdAt - b.createdAt);
+}
+
+function sortTasks(values: Task[]): Task[] {
+  return [...values].sort(
+    (a, b) =>
+      orderValue(a) - orderValue(b) ||
+      a.title.localeCompare(b.title, "zh-CN") ||
+      a.id.localeCompare(b.id)
+  );
 }
 
 export interface UseTasksReturn {
@@ -33,6 +51,7 @@ export interface UseTasksReturn {
   updateTask: (id: string, changes: Partial<TaskValue>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   changeStatus: (id: string, status: TaskStatus) => Promise<void>;
+  reorderTasks: (orderedIds: string[]) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -45,7 +64,7 @@ export function useTasks(): UseTasksReturn {
 
   const loadLocal = useCallback(async () => {
     const list = await taskRepository.findAll(accountId);
-    setTasks(list.filter((t) => !t.deleted).map(toDomain));
+    setTasks(sortTaskValues(list.filter((t) => !t.deleted)).map(toDomain));
   }, [accountId]);
 
   const refresh = useCallback(async () => {
@@ -60,6 +79,7 @@ export function useTasks(): UseTasksReturn {
             ...r,
             accountId,
             actualMinutes: existing?.actualMinutes ?? 0,
+            orderIndex: existing?.orderIndex ?? r.orderIndex ?? Date.now(),
             createdAt: existing?.createdAt ?? Date.now(),
             updatedAt: Date.now(),
             deleted: false,
@@ -103,30 +123,32 @@ export function useTasks(): UseTasksReturn {
       data: Omit<TaskValue, "id" | "accountId" | "projectId" | "createdAt" | "updatedAt" | "deleted" | "actualMinutes">
     ) => {
       const now = Date.now();
+      const existingTasks = await taskRepository.findAll(accountId);
+      const nextOrderIndex =
+        existingTasks.reduce((max, task) => Math.max(max, task.orderIndex ?? -1), -1) + 1;
       const task: TaskValue = {
         ...data,
         id: crypto.randomUUID(),
         accountId,
         projectId,
         actualMinutes: 0,
+        orderIndex: data.orderIndex ?? nextOrderIndex,
         createdAt: now,
         updatedAt: now,
         deleted: false,
       };
       await taskRepository.create(task);
       await enqueue("CREATE", task.id, task);
-      setTasks((prev) => [...prev, toDomain(task)]);
+      setTasks((prev) => sortTasks([...prev, toDomain(task)]));
     },
-    [enqueue]
+    [accountId, enqueue]
   );
 
   const updateTask = useCallback(
     async (id: string, changes: Partial<TaskValue>) => {
       await taskRepository.update(id, changes);
       await enqueue("UPDATE", id, changes);
-      setTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, ...changes } : t))
-      );
+      setTasks((prev) => sortTasks(prev.map((t) => (t.id === id ? { ...t, ...changes } : t))));
     },
     [enqueue]
   );
@@ -145,6 +167,28 @@ export function useTasks(): UseTasksReturn {
       await updateTask(id, { status });
     },
     [updateTask]
+  );
+
+  const reorderTasks = useCallback(
+    async (orderedIds: string[]) => {
+      const orderMap = new Map(orderedIds.map((id, index) => [id, index]));
+      const now = Date.now();
+      await Promise.all(
+        orderedIds.map(async (id, index) => {
+          const changes: Partial<TaskValue> = { orderIndex: index, updatedAt: now };
+          await taskRepository.update(id, changes);
+          await enqueue("UPDATE", id, changes);
+        })
+      );
+      setTasks((prev) =>
+        sortTasks(
+          prev.map((task) =>
+            orderMap.has(task.id) ? { ...task, orderIndex: orderMap.get(task.id)! } : task
+          )
+        )
+      );
+    },
+    [enqueue]
   );
 
   useEffect(() => {
@@ -175,6 +219,7 @@ export function useTasks(): UseTasksReturn {
     updateTask,
     deleteTask,
     changeStatus,
+    reorderTasks,
     refresh,
   };
 }

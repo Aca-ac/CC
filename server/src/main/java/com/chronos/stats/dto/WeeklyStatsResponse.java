@@ -3,21 +3,28 @@ package com.chronos.stats.dto;
 import java.util.List;
 
 public record WeeklyStatsResponse(
-        int totalCompleted,
+        String weekStart,
+        String weekEnd,
+        int totalTasks,
+        int completedTasks,
         double completionRate,
-        List<DailyMinutes> dailyMinutes,
-        List<ProjectDistribution> projectDistribution
+        int totalFocusMinutes,
+        int habitCheckins,
+        int learningLogs,
+        List<DailyStats> dailyStats,
+        List<ProjectStats> projectDistribution
 ) {
-    public record DailyMinutes(
+    public record DailyStats(
             String date,
-            int minutes
-    ) {
-    }
+            int tasksCompleted,
+            int focusMinutes,
+            int checkins
+    ) {}
 
-    public record ProjectDistribution(
+    public record ProjectStats(
             String projectId,
             String projectName,
-            int minutes
-    ) {
-    }
+            int totalTasks,
+            int completedTasks
+    ) {}
 }

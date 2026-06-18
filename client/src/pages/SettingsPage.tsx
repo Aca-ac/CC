@@ -1,14 +1,27 @@
-import { useState } from "react";
-import { Activity, Bot, ExternalLink, RefreshCw, Save, Server, Trash2, ShieldAlert } from "lucide-react";
-import { useAuth } from "../hooks/useAuth";
-import { apiClient } from "../services/apiClient";
+import { useCallback, useEffect, useState } from "react";
 import {
-  isPublicHttp,
-  loadAiSettings,
-  maskKey,
-  saveAiSettings,
-  type AiSettings,
-} from "../services/aiService";
+  IconAi,
+  IconCheck,
+  IconRefresh,
+  IconSettings,
+  IconTrash,
+  IconUpload,
+} from "../components/icons";
+import {
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  StateMessage,
+  ThemeToggle,
+} from "../components/ui";
+import { useTheme } from "../contexts/ThemeContext";
+import { useAuth } from "../hooks/useAuth";
+import { apiClient, type AiSettingsItem } from "../services/apiClient";
 import {
   CURRENT_APP_VERSION,
   checkForUpdates,
@@ -16,26 +29,48 @@ import {
   type UpdateCheckResult,
 } from "../services/updateService";
 
-const PROVIDER_PRESETS = [
-  { label: "Server default", value: "server", baseUrl: "", model: "gpt-4o-mini" },
-  { label: "OpenAI", value: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
-  { label: "Azure OpenAI", value: "azure", baseUrl: "https://{your-resource}.openai.azure.com/openai/deployments/{deployment}", model: "gpt-4o" },
-  { label: "DeepSeek", value: "deepseek", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
-  { label: "SiliconFlow", value: "siliconflow", baseUrl: "https://api.siliconflow.cn/v1", model: "deepseek-ai/DeepSeek-V3" },
-  { label: "Custom", value: "custom", baseUrl: "", model: "" },
+// 后端 AiProviderFactory 支持的 provider；Key 以大写 provider 名加密存储，
+// 各 provider 的 endpoint/model 由服务端部署配置决定。
+const AI_PROVIDERS = [
+  { code: "OPENAI", label: "OpenAI 兼容" },
+  { code: "DEEPSEEK", label: "DeepSeek" },
+  { code: "MIMO", label: "MiMo" },
 ];
 
 export function SettingsPage() {
-  const { apiBaseUrl, setApiBaseUrl, offline } = useAuth();
+  const { apiBaseUrl, setApiBaseUrl, offline, session } = useAuth();
+  const { theme } = useTheme();
   const [urlInput, setUrlInput] = useState(apiBaseUrl);
   const [healthStatus, setHealthStatus] = useState<string | null>(null);
+  const [healthKind, setHealthKind] = useState<"info" | "error">("info");
   const [healthLoading, setHealthLoading] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
-  const [aiSettings, setAiSettings] = useState<AiSettings>(() => loadAiSettings());
+
+  const [aiProvider, setAiProvider] = useState("OPENAI");
   const [keyInput, setKeyInput] = useState("");
+  const [aiSettings, setAiSettings] = useState<AiSettingsItem[]>([]);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+
+  const aiManageable = Boolean(session) && !offline;
+
+  const refreshAiSettings = useCallback(async () => {
+    if (!aiManageable) return;
+    try {
+      const list = await apiClient.listAiSettings();
+      setAiSettings(list ?? []);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : String(err));
+    }
+  }, [aiManageable]);
+
+  useEffect(() => {
+    refreshAiSettings();
+  }, [refreshAiSettings]);
 
   const flash = (message: string) => {
     setSaveMsg(message);
@@ -44,12 +79,13 @@ export function SettingsPage() {
 
   const handleSaveUrl = () => {
     setApiBaseUrl(urlInput.trim() || "/api");
-    flash("API address saved.");
+    flash("API 地址已保存");
   };
 
   const handleHealthCheck = async () => {
     if (offline) {
-      setHealthStatus("Offline mode cannot check the server.");
+      setHealthKind("error");
+      setHealthStatus("离线模式下无法检查服务端。");
       return;
     }
 
@@ -57,49 +93,50 @@ export function SettingsPage() {
     setHealthStatus(null);
     try {
       const result = await apiClient.health();
-      setHealthStatus(`Server healthy: ${result.service}`);
+      setHealthKind("info");
+      setHealthStatus(`服务端正常：${result.service}`);
     } catch (err) {
-      setHealthStatus(err instanceof Error ? err.message : "Health check failed.");
+      setHealthKind("error");
+      setHealthStatus(err instanceof Error ? err.message : "健康检查失败。");
     } finally {
       setHealthLoading(false);
     }
   };
 
-  const handlePresetChange = (value: string) => {
-    const preset = PROVIDER_PRESETS.find((p) => p.value === value);
-    if (!preset) return;
-    const next: AiSettings = {
-      mode: value === "server" ? "server" : "custom",
-      baseUrl: preset.baseUrl,
-      model: preset.model,
-      apiKey: aiSettings.apiKey,
-    };
-    setAiSettings(next);
-  };
+  const currentMaskedKey = aiSettings.find((item) => item.provider === aiProvider)?.maskedKey ?? null;
 
-  const handleSaveAi = () => {
-    if (publicHttpBlocked) {
-      flash("Cannot save: public HTTP is not allowed for BYOK.");
+  const handleSaveAi = async () => {
+    const key = keyInput.trim();
+    if (key.length < 8) {
+      setAiError("API Key 至少需要 8 个字符。");
       return;
     }
-    const next: AiSettings = {
-      ...aiSettings,
-      baseUrl: aiSettings.baseUrl.trim(),
-      model: aiSettings.model.trim() || "gpt-4o-mini",
-      apiKey: keyInput.trim() || aiSettings.apiKey,
-    };
-    saveAiSettings(next);
-    setAiSettings(next);
-    setKeyInput("");
-    flash("AI settings saved locally.");
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      await apiClient.updateAiSettings({ provider: aiProvider, apiKey: key, isCustom: true });
+      setKeyInput("");
+      await refreshAiSettings();
+      flash("AI Key 已加密保存到服务端");
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiBusy(false);
+    }
   };
 
-  const handleClearKey = () => {
-    const next = { ...aiSettings, apiKey: "" };
-    saveAiSettings(next);
-    setAiSettings(next);
-    setKeyInput("");
-    flash("Local AI key cleared.");
+  const handleClearKey = async () => {
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      await apiClient.deleteAiSettings(aiProvider);
+      await refreshAiSettings();
+      flash("已删除该 provider 的 Key");
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiBusy(false);
+    }
   };
 
   const handleCheckUpdates = async () => {
@@ -109,7 +146,7 @@ export function SettingsPage() {
       const result = await checkForUpdates();
       setUpdateResult(result);
     } catch (err) {
-      setUpdateError(err instanceof Error ? err.message : "Update check failed.");
+      setUpdateError(err instanceof Error ? err.message : "更新检查失败。");
     } finally {
       setUpdateLoading(false);
     }
@@ -119,221 +156,190 @@ export function SettingsPage() {
     await openReleasePage(updateResult?.releaseUrl ?? "https://github.com/Vincent-Ctrl-18/Chronos/releases");
   };
 
-  const aiUsesCustom = aiSettings.mode === "custom";
-  const publicHttpWarning = aiUsesCustom && isPublicHttp(aiSettings.baseUrl);
-  const publicHttpBlocked = publicHttpWarning && aiSettings.apiKey.length > 0;
-
-  const currentPreset = PROVIDER_PRESETS.find(
-    (p) => p.value === (aiSettings.mode === "server" ? "server" : "custom")
-  ) ?? PROVIDER_PRESETS[0];
-
   return (
-    <section className="page-stack">
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>API Configuration</h2>
-          <p>
-            Configure the backend service address. The desktop app defaults to the production Chronos API, and
-            local development can override it here.
-          </p>
-        </div>
-        <div className="settings-list">
-          <label>
-            <span>
-              <Server size={14} style={{ verticalAlign: "middle", marginRight: 4 }} />
-              API base URL
-            </span>
-            <input
-              type="text"
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="https://vincentt.xyz/chronos/api"
-            />
-          </label>
-        </div>
-        <div className="row-actions" style={{ marginTop: 12 }}>
-          <button className="btn btn-primary" onClick={handleSaveUrl}>
-            <Save size={14} />
-            Save URL
-          </button>
-          <button className="btn btn-secondary" onClick={handleHealthCheck} disabled={healthLoading || offline}>
-            <Activity size={14} />
-            {healthLoading ? "Checking..." : "Health check"}
-          </button>
-        </div>
-        {healthStatus && (
-          <div className="auth-error" style={{ marginTop: 12 }}>
-            {healthStatus}
-          </div>
-        )}
-      </section>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Settings"
+        title="系统设置"
+        description="配置外观、后端地址、AI 服务和桌面更新策略。"
+        actions={
+          <Badge tone={offline ? "warning" : "success"} dot>
+            {offline ? "离线模式" : "在线模式"}
+          </Badge>
+        }
+      />
 
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>App Updates</h2>
-          <p>
-            Check the latest GitHub release from inside Chronos. This lightweight flow opens the release page when
-            an installer is available.
-          </p>
-        </div>
-        <div className="update-card">
-          <div>
-            <span>Current version</span>
-            <strong>v{CURRENT_APP_VERSION}</strong>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        <Card>
+          <CardHeader
+            title="外观"
+            subtitle="主题会保存在本机，下次启动自动恢复。"
+            action={<Badge tone={theme === "dark" ? "neutral" : "brand"}>{theme === "dark" ? "深色" : "浅色"}</Badge>}
+          />
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-line bg-surface p-3">
+            <div className="min-w-0">
+              <p className="text-[0.9rem] font-medium text-ink">界面主题</p>
+              <p className="mt-1 text-[0.8rem] text-muted">使用紧凑圆角和中性深色面板。</p>
+            </div>
+            <ThemeToggle />
           </div>
-          <div className="update-actions">
-            <button className="btn-secondary" onClick={handleCheckUpdates} disabled={updateLoading}>
-              <RefreshCw size={14} />
-              {updateLoading ? "Checking..." : "Check updates"}
-            </button>
-            {(updateResult?.status === "available" || updateResult?.status === "unavailable") && (
-              <button className="btn-primary" onClick={handleOpenRelease}>
-                <ExternalLink size={14} />
-                Open releases
-              </button>
-            )}
-          </div>
-        </div>
-        {updateResult && (
-          <div className={`update-message ${updateResult.status === "available" ? "update-message-new" : ""}`}>
-            {updateResult.message}
-          </div>
-        )}
-        {updateError && (
-          <div className="auth-error" style={{ marginTop: 12 }}>
-            {updateError}
-          </div>
-        )}
-      </section>
+        </Card>
 
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>AI Service</h2>
-          <p>
-            Choose a provider preset or configure your own OpenAI-compatible endpoint.
-            Your API key is stored only on this device.
-          </p>
-        </div>
-        <div className="settings-list">
-          <label>
-            <span>
-              <Bot size={14} style={{ verticalAlign: "middle", marginRight: 4 }} />
-              Provider preset
-            </span>
-            <select
-              value={currentPreset.value}
-              onChange={(e) => handlePresetChange(e.target.value)}
+        <Card>
+          <CardHeader
+            title="API 地址"
+            subtitle="桌面端和网页端都会从这里读取后端服务地址。"
+            action={<Badge tone="info">{apiBaseUrl || "/api"}</Badge>}
+          />
+          <div className="grid gap-3">
+            <Field label="API base URL" hint="留空会回到 /api。">
+              <Input
+                type="text"
+                aria-label="API base URL"
+                value={urlInput}
+                onChange={(event) => setUrlInput(event.target.value)}
+                placeholder="https://vincentt.xyz/chronos/api"
+              />
+            </Field>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={handleSaveUrl}>
+                <IconCheck size={15} />
+                保存 API 地址
+              </Button>
+              <Button variant="secondary" onClick={handleHealthCheck} disabled={healthLoading || offline}>
+                <IconRefresh size={15} className={healthLoading ? "animate-spin" : undefined} />
+                {healthLoading ? "检查中" : "健康检查"}
+              </Button>
+            </div>
+            {healthStatus && <StateMessage kind={healthKind}>{healthStatus}</StateMessage>}
+          </div>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader
+          title="AI 服务（BYOK）"
+          subtitle="自带 Key 经服务端 AES-GCM 加密保存；未配置时后端使用内置 Mock。"
+          action={
+            currentMaskedKey ? (
+              <Badge tone="success">{currentMaskedKey}</Badge>
+            ) : (
+              <Badge tone="neutral">未配置 Key</Badge>
+            )
+          }
+        />
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)]">
+          <div className="space-y-3">
+            <Field label="Provider">
+              <Select value={aiProvider} onChange={(event) => setAiProvider(event.target.value)}>
+                {AI_PROVIDERS.map((provider) => (
+                  <option key={provider.code} value={provider.code}>
+                    {provider.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            <Field
+              label="API Key"
+              hint={currentMaskedKey ? `当前已配置：${currentMaskedKey}` : "仅在线登录后可配置（HTTPS 环境）。"}
             >
-              {PROVIDER_PRESETS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            <span>Base URL</span>
-            <input
-              type="text"
-              value={aiSettings.baseUrl}
-              onChange={(e) => setAiSettings({ ...aiSettings, baseUrl: e.target.value })}
-              placeholder="https://api.openai.com/v1"
-              disabled={!aiUsesCustom}
-            />
-          </label>
-          <label>
-            <span>Model</span>
-            <input
-              type="text"
-              value={aiSettings.model}
-              onChange={(e) => setAiSettings({ ...aiSettings, model: e.target.value })}
-              placeholder="gpt-4o-mini"
-              disabled={!aiUsesCustom}
-            />
-          </label>
-          <label>
-            <span>
-              API Key
-              {aiSettings.apiKey ? (
-                <span className="key-mask"> ({maskKey(aiSettings.apiKey)})</span>
-              ) : null}
-            </span>
-            <div className="input-with-toggle">
-              <input
+              <Input
                 type="password"
                 value={keyInput}
-                onChange={(e) => setKeyInput(e.target.value)}
-                placeholder={aiSettings.apiKey ? "Leave blank to keep current key" : "sk-..."}
-                disabled={!aiUsesCustom}
+                onChange={(event) => setKeyInput(event.target.value)}
+                placeholder="sk-..."
+                disabled={!aiManageable || aiBusy}
+                aria-label="AI API Key"
               />
+            </Field>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={handleSaveAi} disabled={!aiManageable || aiBusy}>
+                <IconCheck size={15} />
+                保存 Key
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleClearKey}
+                disabled={!aiManageable || aiBusy || !currentMaskedKey}
+              >
+                <IconTrash size={15} />
+                删除 Key
+              </Button>
             </div>
-          </label>
-
-          <label className="checkbox-row">
-            <span>
-              <ShieldAlert size={14} style={{ verticalAlign: "middle", marginRight: 4 }} />
-              Allow fallback to server proxy when custom provider fails
-            </span>
-            <input
-              type="checkbox"
-              checked={aiSettings.mode === "server" || aiSettings.mode === "custom"}
-              onChange={(e) =>
-                setAiSettings({ ...aiSettings, mode: e.target.checked ? "custom" : "server" })
-              }
-              disabled={!aiUsesCustom}
-            />
-          </label>
-        </div>
-
-        {publicHttpWarning && (
-          <div className="auth-error" style={{ marginTop: 12 }} role="alert">
-            <ShieldAlert size={14} style={{ verticalAlign: "middle", marginRight: 6 }} />
-            This custom AI base URL uses public HTTP. BYOK is disabled for security.
-            Please use HTTPS before entering an API key.
           </div>
-        )}
 
-        <div className="row-actions" style={{ marginTop: 12 }}>
-          <button
-            className="btn btn-primary"
-            onClick={handleSaveAi}
-            disabled={publicHttpBlocked}
-          >
-            <Save size={14} />
-            Save AI settings
-          </button>
-          <button className="btn btn-secondary" onClick={handleClearKey} disabled={!aiSettings.apiKey}>
-            <Trash2 size={14} />
-            Clear local key
-          </button>
-        </div>
-        {saveMsg && (
-          <div className="auth-error" style={{ marginTop: 12 }}>
-            {saveMsg}
+          <div className="space-y-3">
+            <div className="rounded-lg border border-line bg-surface p-3">
+              <div className="flex items-start gap-2">
+                <IconAi size={18} className="mt-0.5 text-brand" />
+                <div className="min-w-0">
+                  <p className="text-[0.9rem] font-medium text-ink">调用策略</p>
+                  <p className="mt-1 text-[0.82rem] leading-relaxed text-muted">
+                    拆解与复盘优先使用所选 provider 的加密 Key；服务端按部署配置选择启用的 provider，
+                    无可用 Key 时回落内置 Mock，核心流程不受影响。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {!aiManageable && (
+              <StateMessage>登录在线后可配置 AI Key（Key 加密存储于服务端，不写入本机）。</StateMessage>
+            )}
+            {aiError && <StateMessage kind="error">{aiError}</StateMessage>}
+            {saveMsg && <StateMessage>{saveMsg}</StateMessage>}
           </div>
-        )}
-      </section>
+        </div>
+      </Card>
 
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>Sync Policy</h2>
-          <p>
-            Data is written locally first. After login and network recovery, cloud sync uses last-write-wins for
-            the first release.
-          </p>
-        </div>
-        <div className="settings-list">
-          <label>
-            <span>Local-first sync</span>
-            <input type="checkbox" checked readOnly />
-          </label>
-          <label>
-            <span>AI drafts require confirmation before they affect tasks</span>
-            <input type="checkbox" checked readOnly />
-          </label>
-        </div>
-      </section>
-    </section>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <CardHeader
+            title="应用更新"
+            subtitle="检查 GitHub Release；桌面端会打开系统浏览器下载。"
+            action={<Badge tone="neutral">v{CURRENT_APP_VERSION}</Badge>}
+          />
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="secondary" onClick={handleCheckUpdates} disabled={updateLoading}>
+                <IconRefresh size={15} className={updateLoading ? "animate-spin" : undefined} />
+                {updateLoading ? "检查中" : "检查更新"}
+              </Button>
+              {(updateResult?.status === "available" || updateResult?.status === "unavailable") && (
+                <Button onClick={handleOpenRelease}>
+                  <IconUpload size={15} />
+                  打开发布页
+                </Button>
+              )}
+            </div>
+            {updateResult && <StateMessage kind="info">{updateResult.message}</StateMessage>}
+            {updateError && <StateMessage kind="error">{updateError}</StateMessage>}
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="同步策略"
+            subtitle="Chronos 继续保持本地优先，网络恢复后再同步。"
+            action={<IconSettings size={18} className="text-brand" />}
+          />
+          <div className="grid gap-2">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2">
+              <span className="text-[0.86rem] text-ink">本地优先写入</span>
+              <Badge tone="success">启用</Badge>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2">
+              <span className="text-[0.86rem] text-ink">AI 草稿确认后落库</span>
+              <Badge tone="brand">启用</Badge>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2">
+              <span className="text-[0.86rem] text-ink">冲突由用户选择保留版本</span>
+              <Badge tone="warning">手动</Badge>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </div>
   );
 }

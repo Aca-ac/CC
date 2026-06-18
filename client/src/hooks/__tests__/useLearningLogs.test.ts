@@ -46,6 +46,42 @@ describe("useLearningLogs", () => {
     expect(result.current.logs[0].actualMinutes).toBe(45);
   });
 
+  it("should update and delete manual logs", async () => {
+    const { result } = renderHook(() => useLearningLogs());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.createManualLog({
+        projectId: "project-1",
+        content: "初始日志",
+        actualMinutes: 30,
+        difficulty: 3,
+        links: [],
+      });
+    });
+
+    const id = result.current.logs[0].id;
+
+    await act(async () => {
+      await result.current.updateManualLog(id, {
+        content: "更新日志",
+        actualMinutes: 60,
+      });
+    });
+
+    expect(result.current.logs[0].content).toBe("更新日志");
+    expect(result.current.logs[0].actualMinutes).toBe(60);
+
+    await act(async () => {
+      await result.current.deleteManualLog(id);
+    });
+
+    expect(result.current.logs).toHaveLength(0);
+  });
+
   it("should include completed timer sessions in unified list", async () => {
     // 先创建一个已完成的计时器 session
     const session = {

@@ -32,11 +32,18 @@ describe("useTimer", () => {
       await result.current.startTimer("project-1");
     });
 
-    await expect(
-      act(async () => {
-        await result.current.startTimer("project-2");
-      })
-    ).rejects.toThrow("已有一个活跃计时器");
+    // 第二次启动应被拒绝：保持原有计时器并设置错误提示（hook 采用 error 状态而非抛异常）
+    await act(async () => {
+      await result.current.startTimer("project-2");
+    });
+
+    expect(result.current.timer.active).toBe(true);
+    expect(result.current.timer.projectId).toBe("project-1");
+    expect(result.current.timer.error).toContain("已有一个活跃计时器");
+
+    // 只应存在一个会话，第二次启动未创建新的 focus session
+    const sessions = await focusSessionRepository.findAll(ACCOUNT_ID);
+    expect(sessions).toHaveLength(1);
   });
 
   it("should stop timer and save duration", async () => {

@@ -1,4 +1,5 @@
 import type { TaskPriority, TaskStatus } from "../types/domain";
+import { Badge, type Tone } from "./ui/Badge";
 
 const statusText: Record<TaskStatus, string> = {
   TODO: "未开始",
@@ -8,6 +9,14 @@ const statusText: Record<TaskStatus, string> = {
   ARCHIVED: "已归档",
 };
 
+const statusToneMap: Record<TaskStatus, Tone> = {
+  TODO: "neutral",
+  IN_PROGRESS: "brand",
+  PAUSED: "warning",
+  DONE: "success",
+  ARCHIVED: "neutral",
+};
+
 const priorityText: Record<TaskPriority, string> = {
   LOW: "低",
   MEDIUM: "中",
@@ -15,15 +24,21 @@ const priorityText: Record<TaskPriority, string> = {
   URGENT: "紧急",
 };
 
-export function StatusBadge({ status }: { status: TaskStatus }) {
-  return <span className={`badge status-${status.toLowerCase()}`}>{statusText[status]}</span>;
-}
+const priorityToneMap: Record<TaskPriority, Tone> = {
+  LOW: "neutral",
+  MEDIUM: "warning",
+  HIGH: "brand",
+  URGENT: "danger",
+};
 
-export function PriorityBadge({ priority }: { priority: TaskPriority }) {
+export function StatusBadge({ status }: { status: TaskStatus }) {
   return (
-    <span className={`badge priority-${priority.toLowerCase()}`}>
-      {priorityText[priority]}优先级
-    </span>
+    <Badge tone={statusToneMap[status]} dot>
+      {statusText[status]}
+    </Badge>
   );
 }
 
+export function PriorityBadge({ priority }: { priority: TaskPriority }) {
+  return <Badge tone={priorityToneMap[priority]}>{priorityText[priority]} · 优先级</Badge>;
+}

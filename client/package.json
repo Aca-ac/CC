@@ -1,8 +1,9 @@
 {
   "name": "@chronos/client",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Chronos Electron + React + Vite 前端脚手架。",
+  "author": "Vincent",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -14,14 +15,20 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.2.8",
+    "dompurify": "^3.4.11",
+    "framer-motion": "^12.40.0",
     "idb": "^8.0.0",
     "lucide-react": "^0.468.0",
+    "marked": "^18.0.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.0",
+    "recharts": "^3.8.1",
     "uuid": "^11.0.3"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.1",
     "@testing-library/react": "^16.1.0",
     "@types/node": "^22.10.1",
     "@types/react": "^19.0.1",
@@ -33,8 +40,10 @@
     "electron-builder": "^26.8.1",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^29.1.1",
+    "tailwindcss": "^4.3.1",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
+    "vite-plugin-pwa": "^1.3.0",
     "vitest": "^2.1.8",
     "wait-on": "^8.0.1"
   },
@@ -50,7 +59,7 @@
       "package.json"
     ],
     "win": {
-      "icon": "public/app-icon.ico",
+      "icon": "public/icons/chronos-512.png",
       "target": [
         {
           "target": "nsis",

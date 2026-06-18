@@ -1,47 +1,107 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Wand2, AlertTriangle, PenLine, CheckCircle, XCircle, RotateCcw } from "lucide-react";
-import { apiClient } from "../services/apiClient";
+import { motion } from "framer-motion";
+import { IconAi, IconCheckCircle, IconRefresh, IconSparkles, IconTasks } from "../components/icons";
+import { PriorityBadge } from "../components/StatusBadge";
+import {
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  SkeletonList,
+  StateMessage,
+  Textarea,
+} from "../components/ui";
+import { aiService, type BreakdownTree, type CommitTaskNode } from "../services/aiService";
 import { useProjects } from "../hooks/useProjects";
+import { fadeUp, staggerContainer } from "../lib/motion";
+import type { TaskPriority } from "../types/domain";
 
 interface DraftTask {
   id: string;
+  stageIndex: number;
+  stageTitle: string;
   title: string;
   description: string;
   estimatedMinutes: number;
-  weekIndex: number;
-  editable: boolean;
+  priority: TaskPriority;
+}
+
+const PRIORITIES: TaskPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+
+function normalizePriority(value: string): TaskPriority {
+  const upper = (value ?? "").toUpperCase() as TaskPriority;
+  return PRIORITIES.includes(upper) ? upper : "MEDIUM";
+}
+
+function toDrafts(tree: BreakdownTree): DraftTask[] {
+  return tree.stages.flatMap((stage, stageIndex) =>
+    stage.tasks.map((task, taskIndex) => ({
+      id: `${stageIndex}-${taskIndex}`,
+      stageIndex,
+      stageTitle: stage.title,
+      title: task.title,
+      description: task.description,
+      estimatedMinutes: Math.max(1, task.estimatedMinutes || 30),
+      priority: normalizePriority(task.priority),
+    })),
+  );
+}
+
+function toCommitNode(draft: DraftTask): CommitTaskNode {
+  return {
+    parentTaskId: null,
+    title: draft.title.trim() || "未命名任务",
+    description: draft.description.trim(),
+    estimatedMinutes: Math.max(1, draft.estimatedMinutes),
+    priority: draft.priority,
+    subtasks: [],
+  };
 }
 
 export function AiBreakdownPage() {
+  const { projects } = useProjects();
   const [goal, setGoal] = useState("");
   const [weeks, setWeeks] = useState(4);
+  const [projectId, setProjectId] = useState("");
+  const [tree, setTree] = useState<BreakdownTree | null>(null);
   const [drafts, setDrafts] = useState<DraftTask[]>([]);
   const [loading, setLoading] = useState(false);
+  const [committing, setCommitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const navigate = useNavigate();
-  const { projects } = useProjects();
+
+  const grouped = useMemo(() => {
+    const map = new Map<number, DraftTask[]>();
+    for (const draft of drafts) {
+      const list = map.get(draft.stageIndex) ?? [];
+      list.push(draft);
+      map.set(draft.stageIndex, list);
+    }
+    return [...map.entries()].sort((a, b) => a[0] - b[0]);
+  }, [drafts]);
 
   const handlePreview = async () => {
-    if (!goal.trim()) return;
+    const trimmedGoal = goal.trim();
+    if (!trimmedGoal) return;
+
     setLoading(true);
     setError(null);
     setConfirmed(false);
     try {
-      const response = await apiClient.previewAiBreakdown({ goal, weeks });
-      const raw = response as unknown as { tasks?: Array<Partial<DraftTask>> };
-      const list = (raw.tasks ?? []).map((t, i) => ({
-        id: crypto.randomUUID(),
-        title: t.title ?? "未命名任务",
-        description: t.description ?? "",
-        estimatedMinutes: t.estimatedMinutes ?? 60,
-        weekIndex: t.weekIndex ?? Math.floor(i / (raw.tasks!.length / weeks)) + 1,
-        editable: true,
-      }));
-      setDrafts(list);
+      const normalizedWeeks = Math.min(52, Math.max(1, Number.isFinite(weeks) ? weeks : 4));
+      const response = await aiService.previewBreakdown(trimmedGoal, normalizedWeeks, projectId || undefined);
+      setTree(response);
+      setDrafts(toDrafts(response));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      setTree(null);
       setDrafts([]);
     } finally {
       setLoading(false);
@@ -49,178 +109,218 @@ export function AiBreakdownPage() {
   };
 
   const handleConfirm = async () => {
-    if (drafts.length === 0) return;
-    setLoading(true);
+    if (!tree || drafts.length === 0) return;
+    if (!projectId) {
+      setError("请先选择要落库的目标项目。");
+      return;
+    }
+    setCommitting(true);
+    setError(null);
     try {
+      await aiService.commitBreakdown(tree.draftId, projectId, drafts.map(toCommitNode));
       setConfirmed(true);
-      setTimeout(() => navigate("/tasks"), 1500);
+      window.setTimeout(() => navigate("/tasks"), 900);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoading(false);
+      setCommitting(false);
     }
   };
 
   const handleReject = () => {
+    setTree(null);
     setDrafts([]);
     setError(null);
     setConfirmed(false);
   };
 
-  const handleEdit = (id: string, field: keyof DraftTask, value: string | number) => {
-    setDrafts((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, [field]: value } : d))
-    );
-  };
-
-  const handleManualFallback = () => {
-    navigate("/tasks");
+  const handleEdit = <K extends keyof DraftTask>(id: string, field: K, value: DraftTask[K]) => {
+    setDrafts((prev) => prev.map((draft) => (draft.id === id ? { ...draft, [field]: value } : draft)));
   };
 
   return (
-    <section className="page-stack">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">AI Breakdown</p>
-          <h1>AI 拆解</h1>
-        </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="AI Breakdown"
+        title="AI 拆解工作台"
+        description="把一个学习目标转换为可检查、可编辑的阶段任务草稿，确认后落库到项目。"
+        actions={
+          drafts.length > 0 ? (
+            <Button variant="secondary" size="sm" onClick={handleReject}>
+              <IconRefresh size={15} />
+              清空草稿
+            </Button>
+          ) : undefined
+        }
+      />
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
+        <Card>
+          <CardHeader
+            title="目标输入"
+            subtitle="未配置 Key 时后端使用内置 Mock，演示流程不受影响。"
+            action={<Badge tone="brand">OpenAI 兼容</Badge>}
+          />
+          <div className="grid gap-3.5">
+            <Field label="目标描述">
+              <Textarea
+                rows={5}
+                value={goal}
+                onChange={(e) => setGoal(e.target.value)}
+                placeholder="例如：3 个月内掌握 React 和 TypeScript"
+                autoFocus
+              />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="计划周期（周）">
+                <Input
+                  type="number"
+                  min={1}
+                  max={52}
+                  value={weeks}
+                  onChange={(e) => setWeeks(Number(e.target.value))}
+                />
+              </Field>
+              <Field label="目标项目" hint="确认落库时把任务写入该项目。">
+                <Select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                  <option value="">未选择</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            {projects.length === 0 && (
+              <StateMessage>
+                还没有项目。可以先生成草稿预览，落库前请到「学习项目」创建一个项目。
+              </StateMessage>
+            )}
+            <Button onClick={handlePreview} disabled={loading || !goal.trim()}>
+              <IconSparkles size={16} className={loading ? "animate-pulse" : undefined} />
+              {loading ? "生成中" : "生成草稿"}
+            </Button>
+          </div>
+
+          {error && (
+            <div className="mt-4 space-y-3">
+              <StateMessage kind="error">AI 拆解失败：{error}</StateMessage>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" onClick={handlePreview} disabled={loading || !goal.trim()}>
+                  <IconRefresh size={14} />
+                  重试
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate("/tasks")}>
+                  手动输入任务
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader
+            title={tree ? `拆解预览 · ${tree.goal}` : "拆解预览"}
+            subtitle={tree ? `${drafts.length} 项任务草稿 · 共 ${tree.weeks} 周` : "生成后可逐项调整标题、描述和预计时长"}
+            action={drafts.length > 0 ? <Badge tone="success">{drafts.length} 项</Badge> : undefined}
+          />
+
+          {loading && <SkeletonList rows={5} />}
+
+          {!loading && drafts.length === 0 && (
+            <EmptyState
+              icon={IconAi}
+              title="等待生成草稿"
+              description="输入目标和周期后生成阶段任务。"
+              compact
+            />
+          )}
+
+          {!loading && drafts.length > 0 && !confirmed && (
+            <div className="space-y-4">
+              {grouped.map(([stageIndex, stageDrafts]) => (
+                <div key={stageIndex}>
+                  <div className="mb-2 flex items-center gap-2">
+                    <Badge tone="brand">阶段 {stageIndex + 1}</Badge>
+                    <span className="text-[0.86rem] font-medium text-ink">{stageDrafts[0]?.stageTitle}</span>
+                  </div>
+                  <motion.ul
+                    variants={staggerContainer(0.04)}
+                    initial="hidden"
+                    animate="show"
+                    className="space-y-3"
+                  >
+                    {stageDrafts.map((draft) => (
+                      <motion.li key={draft.id} variants={fadeUp}>
+                        <div className="rounded-lg border border-line bg-surface p-3">
+                          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                            <p className="min-w-0 text-[0.95rem] font-semibold text-ink">{draft.title}</p>
+                            <PriorityBadge priority={draft.priority} />
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-[1.3fr_0.7fr_0.7fr]">
+                            <Field label="任务标题">
+                              <Input value={draft.title} onChange={(e) => handleEdit(draft.id, "title", e.target.value)} />
+                            </Field>
+                            <Field label="预计分钟">
+                              <Input
+                                type="number"
+                                min={1}
+                                value={draft.estimatedMinutes}
+                                onChange={(e) => handleEdit(draft.id, "estimatedMinutes", Number(e.target.value))}
+                              />
+                            </Field>
+                            <Field label="优先级">
+                              <Select
+                                value={draft.priority}
+                                onChange={(e) => handleEdit(draft.id, "priority", e.target.value as TaskPriority)}
+                              >
+                                <option value="LOW">低</option>
+                                <option value="MEDIUM">中</option>
+                                <option value="HIGH">高</option>
+                                <option value="URGENT">紧急</option>
+                              </Select>
+                            </Field>
+                          </div>
+                          <Field label="描述" className="mt-3">
+                            <Textarea
+                              rows={2}
+                              value={draft.description}
+                              onChange={(e) => handleEdit(draft.id, "description", e.target.value)}
+                            />
+                          </Field>
+                        </div>
+                      </motion.li>
+                    ))}
+                  </motion.ul>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {confirmed && (
+            <StateMessage>
+              <span className="inline-flex items-center gap-2 text-success">
+                <IconCheckCircle size={16} />
+                任务已创建，正在跳转到任务列表...
+              </span>
+            </StateMessage>
+          )}
+
+          {drafts.length > 0 && !confirmed && (
+            <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
+              {!projectId && <span className="mr-auto text-[0.8rem] text-muted">请选择目标项目后落库</span>}
+              <Button variant="secondary" onClick={handleReject}>
+                放弃
+              </Button>
+              <Button onClick={handleConfirm} disabled={committing || !projectId}>
+                <IconTasks size={15} />
+                {committing ? "创建中" : "确认落库"}
+              </Button>
+            </div>
+          )}
+        </Card>
       </div>
-
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>输入目标</h2>
-          <p>描述你想完成的学习目标，AI 会帮你拆分成周任务。</p>
-        </div>
-        <div className="form-stack">
-          <label>
-            目标描述
-            <textarea
-              rows={3}
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-              placeholder="例如：3 个月内掌握 React 和 TypeScript"
-            />
-          </label>
-          <label>
-            计划周期（周）
-            <input
-              type="number"
-              min={1}
-              max={52}
-              value={weeks}
-              onChange={(e) => setWeeks(Number(e.target.value))}
-            />
-          </label>
-          <div className="form-actions">
-            <button
-              className="btn-primary"
-              onClick={handlePreview}
-              disabled={loading || !goal.trim()}
-            >
-              <Wand2 size={16} />
-              {loading ? "拆解中..." : "AI 拆解"}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {error && (
-        <section className="panel">
-          <div className="state-message state-failure" role="alert">
-            <AlertTriangle size={16} />
-            <strong>AI 拆解失败：</strong>{error}
-          </div>
-          <div className="row-actions" style={{ marginTop: 12 }}>
-            <button className="btn-primary" onClick={handlePreview} disabled={loading}>
-              <RotateCcw size={14} />
-              重试
-            </button>
-            <button className="btn-secondary" onClick={handleManualFallback}>
-              <PenLine size={14} />
-              手动输入任务
-            </button>
-          </div>
-        </section>
-      )}
-
-      {drafts.length > 0 && !confirmed && (
-        <section className="panel">
-          <div className="panel-heading">
-            <h2>拆解预览（可编辑）</h2>
-            <p>检查并调整 AI 生成的任务，确认后创建到任务列表。</p>
-          </div>
-          <div className="table-shell">
-            <table>
-              <thead>
-                <tr>
-                  <th>周次</th>
-                  <th>任务标题</th>
-                  <th>描述</th>
-                  <th>预计时长（分钟）</th>
-                </tr>
-              </thead>
-              <tbody>
-                {drafts.map((d) => (
-                  <tr key={d.id}>
-                    <td>
-                      <input
-                        type="number"
-                        min={1}
-                        max={weeks}
-                        value={d.weekIndex}
-                        onChange={(e) => handleEdit(d.id, "weekIndex", Number(e.target.value))}
-                        style={{ width: 60 }}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        value={d.title}
-                        onChange={(e) => handleEdit(d.id, "title", e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        value={d.description}
-                        onChange={(e) => handleEdit(d.id, "description", e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        min={1}
-                        value={d.estimatedMinutes}
-                        onChange={(e) => handleEdit(d.id, "estimatedMinutes", Number(e.target.value))}
-                        style={{ width: 80 }}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="row-actions" style={{ marginTop: 16 }}>
-            <button className="btn-primary" onClick={handleConfirm} disabled={loading}>
-              <CheckCircle size={14} />
-              确认创建
-            </button>
-            <button className="btn-secondary" onClick={handleReject}>
-              <XCircle size={14} />
-              放弃
-            </button>
-          </div>
-        </section>
-      )}
-
-      {confirmed && (
-        <section className="panel">
-          <div className="state-message" style={{ borderColor: "var(--success)", color: "var(--success)", background: "var(--success-soft)" }}>
-            <CheckCircle size={16} />
-            任务已创建，正在跳转到任务列表...
-          </div>
-        </section>
-      )}
-    </section>
+    </div>
   );
 }

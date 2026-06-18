@@ -1,41 +1,30 @@
 package com.chronos.ai;
 
-import com.chronos.ai.dto.AiAdviceResponse;
-import com.chronos.ai.dto.AiBreakdownPreviewRequest;
-import com.chronos.ai.dto.AiBreakdownPreviewResponse;
-import com.chronos.ai.dto.AiFeedbackRequest;
+import com.chronos.ai.dto.*;
 import com.chronos.common.ApiResponse;
 import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ai")
 public class AiController {
     private final AiService aiService;
+    private final AiSettingsService aiSettingsService;
 
-    public AiController(AiService aiService) {
+    public AiController(AiService aiService, AiSettingsService aiSettingsService) {
         this.aiService = aiService;
+        this.aiSettingsService = aiSettingsService;
     }
+
+    // ---------- 原有端点 ----------
 
     @PostMapping("/breakdown-preview")
     public ApiResponse<AiBreakdownPreviewResponse> breakdownPreview(
-            @Valid @RequestBody AiBreakdownPreviewRequest request,
-            @RequestHeader(value = "X-Chronos-AI-Base-URL", required = false) String baseUrl,
-            @RequestHeader(value = "X-Chronos-AI-API-Key", required = false) String apiKey,
-            @RequestHeader(value = "X-Chronos-AI-Model", required = false) String model
-    ) {
-        return ApiResponse.ok(aiService.previewBreakdown(request, new AiProviderOverride(baseUrl, apiKey, model)));
-    }
-
-    @PostMapping("/breakdown-commit")
-    public ApiResponse<Void> breakdownCommit(@Valid @RequestBody AiBreakdownPreviewResponse request) {
-        aiService.commitBreakdown(request);
-        return ApiResponse.ok(null);
+            @Valid @RequestBody AiBreakdownPreviewRequest request) {
+        return ApiResponse.ok(aiService.previewBreakdown(request));
     }
 
     @PostMapping("/feedback")
@@ -44,8 +33,43 @@ public class AiController {
         return ApiResponse.ok(null);
     }
 
-    @GetMapping("/advice")
-    public ApiResponse<AiAdviceResponse> advice() {
-        return ApiResponse.ok(aiService.getWeeklyAdvice());
+    // ---------- #31 新增端点 ----------
+
+    @PostMapping("/breakdown/preview")
+    public ApiResponse<BreakdownTreeResponse> breakdownTreePreview(
+            @Valid @RequestBody BreakdownTreePreviewRequest request) {
+        int weeks = request.weeks() == null ? 4 : request.weeks();
+        return ApiResponse.ok(aiService.previewBreakdownTree(request.goal(), weeks, request.projectId()));
+    }
+
+    @PostMapping("/breakdown/commit")
+    public ApiResponse<Map<String, Object>> commitBreakdown(
+            @Valid @RequestBody BreakdownCommitRequest request) {
+        return ApiResponse.ok(aiService.commitBreakdown(request));
+    }
+
+    @PostMapping("/advice")
+    public ApiResponse<WeeklyAdviceResponse> generateAdvice(
+            @RequestParam(required = false) String projectId) {
+        return ApiResponse.ok(aiService.generateWeeklyAdvice(projectId));
+    }
+
+    // ---------- AI Settings 端点 ----------
+
+    @GetMapping("/settings")
+    public ApiResponse<List<AiSettingsResponse>> getSettings() {
+        return ApiResponse.ok(aiSettingsService.getSettings());
+    }
+
+    @PutMapping("/settings")
+    public ApiResponse<AiSettingsResponse> updateSettings(
+            @Valid @RequestBody UpdateAiSettingsRequest request) {
+        return ApiResponse.ok(aiSettingsService.upsertSettings(request));
+    }
+
+    @DeleteMapping("/settings/key/{provider}")
+    public ApiResponse<Void> deleteKey(@PathVariable String provider) {
+        aiSettingsService.deleteSettings(provider);
+        return ApiResponse.ok(null);
     }
 }

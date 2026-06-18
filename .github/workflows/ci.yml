@@ -26,29 +26,12 @@ jobs:
       - name: Typecheck and build client
         run: npm run build --workspace client
 
+      - name: Test client
+        run: npx vitest run --root client
+
   backend-test:
     name: backend-test
-    if: false  # TODO: temporarily disabled until backend tests are fixed
     runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_DATABASE: chronos
-          MYSQL_USER: chronos
-          MYSQL_PASSWORD: chronos_password
-          MYSQL_ROOT_PASSWORD: root_password
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -uroot -proot_password"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-    env:
-      CHRONOS_MYSQL_URL: jdbc:mysql://127.0.0.1:3306/chronos?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-      CHRONOS_MYSQL_USERNAME: chronos
-      CHRONOS_MYSQL_PASSWORD: chronos_password
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -60,9 +43,9 @@ jobs:
           java-version: 17
           cache: maven
 
-      - name: Initialize database
-        run: docker exec "${{ job.services.mysql.id }}" mysql -uroot -proot_password chronos < database/mysql/schema.sql
-
+      # Backend tests run entirely on an in-memory H2 database
+      # (server/src/test/resources/application.yml hardcodes jdbc:h2:mem),
+      # so no MySQL service is needed here. mysql-smoke covers real MySQL.
       - name: Test server and generate coverage report
         run: ./server/mvnw -q verify
 
@@ -76,7 +59,6 @@ jobs:
 
   mysql-smoke:
     name: mysql-smoke
-    if: false  # TODO: temporarily disabled until backend is fixed
     runs-on: ubuntu-latest
     services:
       mysql:

@@ -79,3 +79,29 @@
 - 改动文件：无源码改动，仅执行 Git 操作。
 - 改动目的：初始化本地 Git 仓库，提交脚手架和既有资料文件，并推送到 GitHub。
 - 验证结果：已提交 `d87e3da chore: scaffold Chronos framework`；已推送到 `https://github.com/Vincent-Ctrl-18/Chronos.git` 的 `main` 分支，并设置本地 `main` 跟踪 `origin/main`。
+
+## 2026-06-18 收尾阶段 1（后端集成 + CI）
+
+- 改动文件：`server/`（合并 PR #67 的 M2 后端：计时器/统计/学习日志/同步/AI provider，并修复 6 项评审问题）、`server/src/main/java/com/chronos/ai/provider/OpenAiCompatibleProvider.java`+`AiProviderFactory.java`+`application.yml`（新增通用 OpenAI 兼容 provider，provider 名 `openai`，由 BYOK 设置驱动）、`client/src/hooks/useSync.ts`+`client/src/services/__tests__/syncService.test.ts`（吸收 PR #61 同步逻辑：补齐 useSync hook 与 push/conflict 特征测试，未重写仓储层、未改 UI）、`.github/workflows/ci.yml`（移除 `backend-test`/`mysql-smoke` 的 `if:false` 门禁；`backend-test` 改为纯 H2 运行、不依赖 MySQL 服务；`frontend-check` 增加 `npx vitest run --root client`）、`client/src/hooks/__tests__/useTimer.test.ts`+`client/src/components/__tests__/AppLayout.test.tsx`（修正两处历史失效断言：计时器"防止多活跃"改为断言 error 状态而非抛异常；AppLayout 改为校验品牌文案）。
+- 改动目的：完成项目收尾的第 1 阶段——合并并加固未合并的后端 PR、把 AI 泛化为 OpenAI 兼容协议、吸收前端同步逻辑的缺失部分、让此前被禁用的 CI 检查真正运行并通过。
+- 验证结果：`./server/mvnw verify` 全绿（56 项测试，JaCoCo 覆盖率报告生成）；`npx vitest run`（client）全绿（12 文件 / 38 测试）；`.github/workflows/ci.yml` 通过 `yaml.safe_load` 校验且三个 job 均已启用。
+- 待办（后续阶段）：sync 模块的用户隔离（push 未写 userId、controller 无鉴权）留待阶段 3 鉴权接入时统一处理；前端计时器测试使用真实 `setTimeout`（整套约 3-4 分钟），建议阶段 2 改用 fake timers 提速。
+
+## 2026-06-18 收尾阶段 2（UI 全量重写 + PWA）
+
+- 改动文件：`client/src/styles/global.css`、`client/src/components/icons/`、`client/src/components/ui/`、`client/src/components/AppLayout.tsx`、`client/src/components/ConflictDialog.tsx`、`client/src/pages/{DashboardPage,ProjectsPage,TasksPage,CalendarPage,LearningLogsPage,AiBreakdownPage,StatsPage,SettingsPage,LoginPage,RegisterPage}.tsx`、相关页面/组件测试、`client/vite.config.ts`、`client/index.html`、`client/package.json`、`package-lock.json`、`client/public/icons/chronos-{192,512}.png`。
+- 改动目的：完成阶段 2 UI 全量重写：Tailwind v4 CSS-first 设计系统、手绘 SVG 图标、紧凑圆角、高密度卡片、深浅主题、图标轨侧栏、主要页面改造、登录/注册改造、冲突弹窗改造，并加入可安装 PWA manifest 与 `vite-plugin-pwa` service worker。
+- 验证结果：`npm run build --workspace client` 通过，产出 `manifest.webmanifest`、`registerSW.js`、`sw.js`；`cd client && npx vitest run` 全绿（19 文件 / 48 测试）；`rg -n lucide-react client/src` 无匹配；`rg -n "auth-page|auth-card|auth-form|auth-submit|auth-offline|conflict-overlay|conflict-dialog|settings-list|page-stack|row-actions|update-card" client/src/pages client/src/components` 无匹配。
+- 已知限制：浏览器视觉 QA 受当前环境企业策略阻止，未声明已完成；StatsPage 的 Recharts 在 jsdom 测试中仍输出容器尺寸警告，但测试与构建通过。
+
+## 2026-06-18 收尾阶段 3（P0/P1 功能补齐 + Electron 校验）
+
+- 改动文件：
+  - 习惯（3.1 后端 / 3.5 前端）：`server/.../habit/{HabitController,HabitService,dto/*}`（已提交 4f66d74）；`client/src/hooks/useHabits.ts`、`client/src/pages/HabitsPage.tsx`、`client/src/App.tsx`（新增 `/habits` 导航 + 路由，`周视图`→`日历`）、`client/src/components/icons/index.tsx`（手绘 `IconHabit`/`IconTrophy`）、`client/src/services/apiClient.ts`（习惯端点）。
+  - 同步用户隔离（3.2，已提交 1207716）、任务增强（3.3，已提交 e9adebf）、日历月视图 + iCal 导入（3.4，已提交 8f87043 + `client/src/services/icalImport.ts`）。
+  - Markdown 学习日志（3.6）：`client/src/components/MarkdownView.tsx`（marked + DOMPurify 净化）、`client/src/pages/LearningLogsPage.tsx`（编辑 + 实时预览 + 检索/类型筛选）、`client/src/styles/global.css`（`.markdown-body` prose 样式）、新增依赖 `marked`、`dompurify`。
+  - AI 真实对接（3.7）：`client/src/services/{apiClient,aiService}.ts`、`client/src/hooks/useAiAdvice.ts`、`client/src/pages/{AiBreakdownPage,SettingsPage}.tsx`。前端原先调用的端点与后端漂移（`/ai/breakdown-commit` 404、`GET /ai/advice` 405、`AiProviderOverride` 头部 BYOK 后端未读取），统一改对接可用的结构化端点：`/ai/breakdown/preview`（按周阶段树）+ `/ai/breakdown/commit`（确认后在所选项目下批量建任务）+ `POST /ai/advice`；BYOK 改走服务端 AES-GCM 加密存储 `PUT/GET/DELETE /ai/settings`；无 Key 时后端回落 MockProvider，前端离线/本地演示静默降级。
+  - Electron 打包（3.8）：`client/package.json` 补 `author` 字段（消除 electron-builder 警告）。
+- 改动目的：完成阶段 3 的 P0 校验与 P1 新增（习惯打卡 + 成就、Markdown 日志、AI 拆解/复盘真实调用 + BYOK），并校验 Electron 打包与 release 链路。
+- 验证结果（阶段 3 验收）：后端 `.\server\mvnw.cmd test` BUILD SUCCESS，61 测试 0 失败（含 Habit 3 / AiBreakdown 6 / AiSettings 8 / Sync 2 等）；前端 `npm run build --workspace client` 通过（产出 `dist/` + `dist-electron/{main,preload}.js`），`cd client && npx vitest run` 全绿（24 文件 / 63 测试，其中 `useHabits` 5、`MarkdownView` 4、`useAiAdvice` 2 为本阶段新增）；`electron-builder` 能加载配置、执行 `@electron/rebuild`、下载并解压 Electron 42。CI（`.github/workflows/ci.yml`）三 job 自阶段 1 起已启用。
+- 已知限制：本机 `npm run dist:win` 在解压 Electron 后于 `release\win-unpacked.tmp → win-unpacked` 目录重命名处报 `EPERM`（Windows 实时杀毒/文件锁占用新解压的 `electron.exe`，禁用沙箱后复现，属本机环境限制而非工程缺陷）；安装包以 CI `windows-installer.yml`（`windows-latest` 干净环境、推 `v*.*.*` tag 触发）为权威产出路径。习惯「今日是否已打卡」后端列表未返回，前端用会话内集合追踪（打卡接口幂等）。BYOK 仅托管各 provider 加密 Key，endpoint/model 由服务端部署配置决定。

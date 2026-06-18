@@ -25,6 +25,11 @@ export interface UseLearningLogsReturn {
   createManualLog: (
     data: Omit<LearningLogValue, "id" | "accountId" | "createdAt" | "updatedAt" | "deleted">
   ) => Promise<void>;
+  updateManualLog: (
+    id: string,
+    changes: Partial<Omit<LearningLogValue, "id" | "accountId" | "createdAt" | "updatedAt" | "deleted">>
+  ) => Promise<void>;
+  deleteManualLog: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -126,6 +131,29 @@ export function useLearningLogs(): UseLearningLogsReturn {
     [enqueue]
   );
 
+  const updateManualLog = useCallback(
+    async (
+      id: string,
+      changes: Partial<Omit<LearningLogValue, "id" | "accountId" | "createdAt" | "updatedAt" | "deleted">>
+    ) => {
+      await learningLogRepository.update(id, changes);
+      await enqueue("UPDATE", id, changes);
+      setLogs((prev) =>
+        prev.map((log) => (log.id === id && log.type === "manual" ? { ...log, ...changes } : log))
+      );
+    },
+    [enqueue]
+  );
+
+  const deleteManualLog = useCallback(
+    async (id: string) => {
+      await learningLogRepository.softDelete(id);
+      await enqueue("DELETE", id, { id });
+      setLogs((prev) => prev.filter((log) => log.id !== id));
+    },
+    [enqueue]
+  );
+
   useEffect(() => {
     loadLocal();
   }, [loadLocal]);
@@ -135,6 +163,8 @@ export function useLearningLogs(): UseLearningLogsReturn {
     loading,
     error,
     createManualLog,
+    updateManualLog,
+    deleteManualLog,
     refresh,
   };
 }

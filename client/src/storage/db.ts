@@ -1,7 +1,7 @@
 import { openDB, type IDBPDatabase } from "idb";
 
 const DB_NAME = "chronos";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export interface ProjectValue {
   id: string;
@@ -30,6 +30,7 @@ export interface TaskValue {
   estimatedMinutes: number;
   actualMinutes: number;
   tags: string[];
+  orderIndex?: number;
   createdAt: number;
   updatedAt: number;
   deleted: boolean;
@@ -112,7 +113,7 @@ export function getDB(): Promise<IDBPDatabase> {
   if (dbPromise) return dbPromise;
 
   dbPromise = openDB(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion) {
+    upgrade(db, oldVersion, _newVersion, transaction) {
       if (oldVersion < 1) {
         const projectStore = db.createObjectStore("projects", { keyPath: "id" });
         projectStore.createIndex("by-account", "accountId");
@@ -146,6 +147,13 @@ export function getDB(): Promise<IDBPDatabase> {
         focusStore.createIndex("by-discarded", "discarded");
 
         db.createObjectStore("timerState", { keyPath: "accountId" });
+      }
+
+      if (oldVersion < 3 && db.objectStoreNames.contains("tasks")) {
+        const taskStore = transaction.objectStore("tasks");
+        if (!taskStore.indexNames.contains("by-order")) {
+          taskStore.createIndex("by-order", "orderIndex");
+        }
       }
     },
   });
