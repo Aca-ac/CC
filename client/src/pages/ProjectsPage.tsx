@@ -1,6 +1,35 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
+import { IconCheckCircle, IconEdit, IconPlus, IconProjects, IconRefresh, IconTrash } from "../components/icons";
+import {
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  Field,
+  Input,
+  Modal,
+  PageHeader,
+  ProgressRing,
+  Select,
+  SkeletonList,
+  StateMessage,
+} from "../components/ui";
 import { useProjects } from "../hooks/useProjects";
+import { fadeUp, staggerContainer } from "../lib/motion";
 import type { ProjectValue } from "../storage/db";
+
+type ProjectForm = Omit<ProjectValue, "id" | "accountId" | "createdAt" | "updatedAt" | "deleted">;
+
+const emptyProjectForm: ProjectForm = {
+  name: "",
+  goal: "",
+  startDate: "",
+  endDate: "",
+  status: "ACTIVE",
+  progress: 0,
+};
 
 export function ProjectsPage() {
   const {
@@ -16,27 +45,12 @@ export function ProjectsPage() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<
-    Omit<ProjectValue, "id" | "accountId" | "createdAt" | "updatedAt" | "deleted">
-  >({
-    name: "",
-    goal: "",
-    startDate: "",
-    endDate: "",
-    status: "ACTIVE",
-    progress: 0,
-  });
+  const [deleteTarget, setDeleteTarget] = useState<(typeof projects)[number] | null>(null);
+  const [form, setForm] = useState<ProjectForm>(emptyProjectForm);
   const [formError, setFormError] = useState<string | null>(null);
 
   const resetForm = () => {
-    setForm({
-      name: "",
-      goal: "",
-      startDate: "",
-      endDate: "",
-      status: "ACTIVE",
-      progress: 0,
-    });
+    setForm(emptyProjectForm);
     setFormError(null);
     setEditingId(null);
   };
@@ -59,6 +73,11 @@ export function ProjectsPage() {
     setIsFormOpen(true);
   };
 
+  const closeForm = () => {
+    setIsFormOpen(false);
+    resetForm();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) {
@@ -66,194 +85,237 @@ export function ProjectsPage() {
       return;
     }
     try {
+      const payload = { ...form, progress: Math.max(0, Math.min(100, form.progress)) };
       if (editingId) {
-        await updateProject(editingId, form);
+        await updateProject(editingId, payload);
       } else {
-        await createProject(form);
+        await createProject(payload);
       }
-      setIsFormOpen(false);
-      resetForm();
+      closeForm();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : String(err));
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("确定要删除该项目吗？")) return;
-    await deleteProject(id);
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    await deleteProject(deleteTarget.id);
+    setDeleteTarget(null);
   };
 
+  const activeCount = projects.filter((project) => project.status === "ACTIVE").length;
+  const averageProgress =
+    projects.length > 0
+      ? Math.round(projects.reduce((sum, project) => sum + project.progress, 0) / projects.length)
+      : 0;
+
   return (
-    <section className="page-stack">
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>学习项目</h2>
-          <div className="panel-actions">
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Projects"
+        title="学习项目"
+        description="按项目拆分目标、进度和学习周期。"
+        actions={
+          <>
             {!online && (
-              <span className="badge status-paused" aria-label="离线">
+              <Badge tone="warning" dot aria-label="离线">
                 离线模式
-              </span>
+              </Badge>
             )}
-            <button className="btn-primary" onClick={openCreate}>
-              新建项目
-            </button>
-            <button className="btn-secondary" onClick={refresh} disabled={loading}>
+            <Button variant="secondary" size="sm" onClick={refresh} disabled={loading}>
+              <IconRefresh size={15} className={loading ? "animate-spin" : undefined} />
               刷新
-            </button>
+            </Button>
+            <Button size="sm" onClick={openCreate}>
+              <IconPlus size={15} />
+              新建项目
+            </Button>
+          </>
+        }
+      />
+
+      <div className="grid gap-3.5 sm:grid-cols-3">
+        <Card className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-md bg-brand-soft text-brand">
+            <IconProjects size={19} />
+          </span>
+          <div>
+            <p className="text-xl font-bold text-ink">{projects.length}</p>
+            <p className="text-[0.78rem] text-muted">全部项目</p>
           </div>
-        </div>
-
-        {loading && <div className="state-message">加载中…</div>}
-
-        {error && (
-          <div className="state-message state-failure" role="alert">
-            加载失败：{error}
+        </Card>
+        <Card className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-md bg-success-soft text-success">
+            <IconCheckCircle size={19} />
+          </span>
+          <div>
+            <p className="text-xl font-bold text-ink">{activeCount}</p>
+            <p className="text-[0.78rem] text-muted">进行中</p>
           </div>
-        )}
-
-        {!loading && !error && projects.length === 0 && (
-          <div className="state-message state-empty">
-            暂无项目，点击「新建项目」开始创建。
+        </Card>
+        <Card className="flex items-center gap-3">
+          <ProgressRing value={averageProgress} size={48} stroke={5}>
+            <span className="text-[0.72rem] font-bold text-ink">{averageProgress}%</span>
+          </ProgressRing>
+          <div>
+            <p className="text-xl font-bold text-ink">{averageProgress}%</p>
+            <p className="text-[0.78rem] text-muted">平均进度</p>
           </div>
-        )}
+        </Card>
+      </div>
 
-        {!loading && projects.length > 0 && (
-          <div className="project-grid">
-            {projects.map((project) => (
-              <article className="project-card" key={project.id}>
-                <div>
-                  <h3>{project.name}</h3>
-                  <p>{project.goal}</p>
-                </div>
-                <div
-                  className="progress-wrap"
-                  aria-label={`${project.name} 进度`}
-                >
-                  <span>{project.progress}%</span>
-                  <div className="progress-track">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${project.progress}%` }}
-                    />
+      {loading && <SkeletonList rows={3} />}
+      {error && <StateMessage kind="error">加载失败：{error}</StateMessage>}
+
+      {!loading && !error && projects.length === 0 && (
+        <EmptyState
+          icon={IconProjects}
+          title="暂无项目"
+          description="点击「新建项目」创建第一个学习目标。"
+          action={
+            <Button size="sm" onClick={openCreate}>
+              <IconPlus size={15} />
+              新建项目
+            </Button>
+          }
+        />
+      )}
+
+      {!loading && projects.length > 0 && (
+        <motion.div
+          variants={staggerContainer(0.05)}
+          initial="hidden"
+          animate="show"
+          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        >
+          {projects.map((project) => (
+            <motion.article key={project.id} variants={fadeUp}>
+              <Card className="flex h-full flex-col gap-4">
+                <CardHeader
+                  title={project.name}
+                  subtitle={project.goal || "未填写目标说明"}
+                  action={
+                    <Badge tone={project.status === "ACTIVE" ? "brand" : "neutral"}>
+                      {project.status === "ACTIVE" ? "进行中" : "已归档"}
+                    </Badge>
+                  }
+                  className="mb-0"
+                />
+                <div className="flex items-center gap-4">
+                  <ProgressRing value={project.progress} size={72} stroke={7}>
+                    <span className="text-sm font-bold text-ink">{project.progress}%</span>
+                  </ProgressRing>
+                  <div className="min-w-0 text-[0.82rem] text-muted">
+                    <p>开始：{project.startDate || "未设置"}</p>
+                    <p>结束：{project.endDate || "未设置"}</p>
                   </div>
                 </div>
-                <div className="card-actions">
-                  <button
-                    className="btn-secondary"
-                    onClick={() => openEdit(project)}
-                  >
+                <div className="mt-auto flex flex-wrap gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => openEdit(project)}>
+                    <IconEdit size={14} />
                     编辑
-                  </button>
-                  <button
-                    className="btn-danger"
-                    onClick={() => handleDelete(project.id)}
-                  >
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={() => setDeleteTarget(project)}>
+                    <IconTrash size={14} />
                     删除
-                  </button>
+                  </Button>
                 </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {isFormOpen && (
-        <div className="modal-overlay" onClick={() => setIsFormOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{editingId ? "编辑项目" : "新建项目"}</h3>
-            <form onSubmit={handleSubmit} className="form-stack">
-              <label>
-                名称
-                <input
-                  value={form.name}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, name: e.target.value }))
-                  }
-                />
-              </label>
-              <label>
-                目标
-                <input
-                  value={form.goal}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, goal: e.target.value }))
-                  }
-                />
-              </label>
-              <label>
-                开始日期
-                <input
-                  type="date"
-                  value={form.startDate}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      startDate: e.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                结束日期
-                <input
-                  type="date"
-                  value={form.endDate}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, endDate: e.target.value }))
-                  }
-                />
-              </label>
-              <label>
-                状态
-                <select
-                  value={form.status}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      status: e.target.value as "ACTIVE" | "ARCHIVED",
-                    }))
-                  }
-                >
-                  <option value="ACTIVE">进行中</option>
-                  <option value="ARCHIVED">已归档</option>
-                </select>
-              </label>
-              <label>
-                进度
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={form.progress}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      progress: Number(e.target.value),
-                    }))
-                  }
-                />
-              </label>
-              {formError && (
-                <div className="form-error" role="alert">
-                  {formError}
-                </div>
-              )}
-              <div className="form-actions">
-                <button type="submit" className="btn-primary">
-                  保存
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setIsFormOpen(false)}
-                >
-                  取消
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+              </Card>
+            </motion.article>
+          ))}
+        </motion.div>
       )}
-    </section>
+
+      <Modal
+        open={isFormOpen}
+        onClose={closeForm}
+        title={editingId ? "编辑项目" : "新建项目"}
+        subtitle="项目会先写入本地 IndexedDB，再进入 outbox 等待同步。"
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeForm}>
+              取消
+            </Button>
+            <Button type="submit" form="project-form">
+              保存
+            </Button>
+          </>
+        }
+      >
+        <form id="project-form" onSubmit={handleSubmit} className="grid gap-3.5">
+          <Field label="名称">
+            <Input
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+              autoFocus
+            />
+          </Field>
+          <Field label="目标">
+            <Input
+              value={form.goal}
+              onChange={(e) => setForm((prev) => ({ ...prev, goal: e.target.value }))}
+            />
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="开始日期">
+              <Input
+                type="date"
+                value={form.startDate}
+                onChange={(e) => setForm((prev) => ({ ...prev, startDate: e.target.value }))}
+              />
+            </Field>
+            <Field label="结束日期">
+              <Input
+                type="date"
+                value={form.endDate}
+                onChange={(e) => setForm((prev) => ({ ...prev, endDate: e.target.value }))}
+              />
+            </Field>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="状态">
+              <Select
+                value={form.status}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, status: e.target.value as "ACTIVE" | "ARCHIVED" }))
+                }
+              >
+                <option value="ACTIVE">进行中</option>
+                <option value="ARCHIVED">已归档</option>
+              </Select>
+            </Field>
+            <Field label="进度">
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={form.progress}
+                onChange={(e) => setForm((prev) => ({ ...prev, progress: Number(e.target.value) }))}
+              />
+            </Field>
+          </div>
+          {formError && <StateMessage kind="error">{formError}</StateMessage>}
+        </form>
+      </Modal>
+
+      <Modal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title="删除项目？"
+        subtitle={deleteTarget ? `项目「${deleteTarget.name}」会从当前列表移除，并进入待同步删除队列。` : undefined}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
+              取消
+            </Button>
+            <Button variant="danger" onClick={confirmDelete}>
+              确认删除
+            </Button>
+          </>
+        }
+      >
+        <StateMessage kind="error">删除后仍可通过同步冲突策略保留更高版本；当前操作不会自动合并远端数据。</StateMessage>
+      </Modal>
+    </div>
   );
 }

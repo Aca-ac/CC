@@ -25,7 +25,7 @@ describe("ProjectsPage", () => {
     });
 
     // Open create form
-    fireEvent.click(screen.getByText("新建项目"));
+    fireEvent.click(screen.getAllByText("新建项目")[0]);
     expect(screen.getAllByText("新建项目").length).toBeGreaterThanOrEqual(2);
 
     // Fill form
@@ -57,11 +57,10 @@ describe("ProjectsPage", () => {
       expect(screen.getByText("修改后项目")).toBeDefined();
     });
 
-    // Delete
-    const deleteBtn = screen.getByText("删除");
-    // Mock confirm
-    vi.stubGlobal("confirm", () => true);
-    fireEvent.click(deleteBtn);
+    // Delete via confirmation modal
+    fireEvent.click(screen.getByText("删除"));
+    expect(screen.getByText("删除项目？")).toBeDefined();
+    fireEvent.click(screen.getByText("确认删除"));
 
     await waitFor(() => {
       expect(screen.queryByText("修改后项目")).toBeNull();
