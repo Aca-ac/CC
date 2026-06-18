@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Chronos Electron + React + Vite 前端脚手架。",
+  "author": "Vincent",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
