@@ -126,10 +126,12 @@ export function ProjectsPage() {
               <IconRefresh size={15} className={loading ? "animate-spin" : undefined} />
               刷新
             </Button>
-            <Button size="sm" onClick={openCreate}>
-              <IconPlus size={15} />
-              新建项目
-            </Button>
+            {projects.length > 0 && (
+              <Button size="sm" onClick={openCreate}>
+                <IconPlus size={15} />
+                新建项目
+              </Button>
+            )}
           </>
         }
       />
