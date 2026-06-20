@@ -24,8 +24,8 @@ export async function pushPendingMutations(
   }
 
   const records: SyncRecordItem[] = pending
-    .filter((entry): entry is typeof entry & { entityType: "PROJECT" | "TASK" | "LOG" } =>
-      entry.entityType === "PROJECT" || entry.entityType === "TASK" || entry.entityType === "LOG"
+    .filter((entry): entry is typeof entry & { entityType: "PROJECT" | "TASK" | "LOG" | "FOCUS" } =>
+      entry.entityType === "PROJECT" || entry.entityType === "TASK" || entry.entityType === "LOG" || entry.entityType === "FOCUS"
     )
     .map((entry) => {
       const payload = JSON.parse(entry.payload) as Record<string, unknown>;
@@ -117,12 +117,23 @@ export async function resolveConflict(
   resolution: "local" | "remote"
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const conflict = await findConflictById(conflictId);
+    if (!conflict) {
+      return { success: false, error: "Conflict was not found locally." };
+    }
     const apiResolution = resolution === "local" ? "keep-local" : "keep-cloud";
-    await apiClient.resolveConflict(conflictId, { resolution: apiResolution });
+    const selectedPayload = resolution === "local" ? conflict.localData : conflict.remoteData;
+    await apiClient.resolveConflict({
+      id: conflictId,
+      entityType: conflict.entityType,
+      entityId: conflict.entityId,
+      version: Date.now(),
+      resolvedPayload: selectedPayload,
+      resolveType: apiResolution,
+    });
     await conflictRepository.resolve(conflictId, resolution);
 
-    const conflict = await findConflictById(conflictId);
-    if (conflict && resolution === "remote") {
+    if (resolution === "remote") {
       const pending = await outboxRepository.findPending(accountId);
       const entry = pending.find(
         (item) => item.entityId === conflict.entityId && item.entityType === conflict.entityType
@@ -183,9 +194,10 @@ async function applyRemoteChange(accountId: string, change: SyncRecordItem): Pro
   });
 }
 
-function storeFor(entityType: SyncRecordItem["entityType"]): "projects" | "tasks" | "learningLogs" {
+function storeFor(entityType: SyncRecordItem["entityType"]): "projects" | "tasks" | "learningLogs" | "focusSessions" {
   if (entityType === "PROJECT") return "projects";
   if (entityType === "TASK") return "tasks";
+  if (entityType === "FOCUS") return "focusSessions";
   return "learningLogs";
 }
 

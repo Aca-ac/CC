@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import static com.chronos.enums.ErrorCode.*;
 
@@ -39,8 +41,9 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(NotLoginException.class)
-    public ApiResponse<Void> handleNotLogin(NotLoginException e) {
-        return ApiResponse.fail(UNAUTHORIZED, "请先登录");
+    public ResponseEntity<ApiResponse<Void>> handleNotLogin(NotLoginException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.fail(UNAUTHORIZED, "请先登录"));
     }
 
     @ExceptionHandler(Exception.class)
@@ -49,4 +52,3 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail(INTERNAL_ERROR, "服务器内部错误");
     }
 }
-

@@ -1,7 +1,9 @@
 package com.chronos.sync.dto;
 
+import java.util.List;
+
 public record SyncPushResponse(
         int accepted,
-        int conflictTotal
+        List<SyncConflictDto> conflicts
 ) {
 }

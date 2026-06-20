@@ -95,9 +95,10 @@ public class DashboardService {
                 .max()
                 .orElse(0);
 
-        // 待同步记录数（sync_records 表无 user_id 字段，暂无法按用户过滤；待 sync 模块完善后修复）
+        // 待同步记录数必须按登录账户隔离，不能泄露其他用户的同步状态。
         int syncPendingTotal = syncRecordMapper.selectCount(
                 new LambdaQueryWrapper<SyncRecord>()
+                        .eq(SyncRecord::getUserId, userId)
                         .eq(SyncRecord::getSyncStatus, "PENDING")
         ).intValue();
 

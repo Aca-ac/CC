@@ -24,7 +24,12 @@ import { useAuth } from "../hooks/useAuth";
 import { apiClient, type AiSettingsItem } from "../services/apiClient";
 import {
   CURRENT_APP_VERSION,
+  checkDesktopUpdate,
   checkForUpdates,
+  downloadDesktopUpdate,
+  hasDesktopUpdater,
+  installDesktopUpdate,
+  type DesktopUpdateStatus,
   openReleasePage,
   type UpdateCheckResult,
 } from "../services/updateService";
@@ -53,6 +58,7 @@ export function SettingsPage() {
   const [aiError, setAiError] = useState<string | null>(null);
 
   const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
+  const [desktopUpdateStatus, setDesktopUpdateStatus] = useState<DesktopUpdateStatus | null>(null);
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
@@ -71,6 +77,11 @@ export function SettingsPage() {
   useEffect(() => {
     refreshAiSettings();
   }, [refreshAiSettings]);
+
+  useEffect(() => {
+    if (!hasDesktopUpdater()) return;
+    return window.chronosDesktop?.updates?.onStatus(setDesktopUpdateStatus);
+  }, []);
 
   const flash = (message: string) => {
     setSaveMsg(message);
@@ -143,10 +154,38 @@ export function SettingsPage() {
     setUpdateLoading(true);
     setUpdateError(null);
     try {
+      if (hasDesktopUpdater()) {
+        setDesktopUpdateStatus(await checkDesktopUpdate());
+        return;
+      }
       const result = await checkForUpdates();
       setUpdateResult(result);
     } catch (err) {
       setUpdateError(err instanceof Error ? err.message : "更新检查失败。");
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const handleDownloadUpdate = async () => {
+    setUpdateLoading(true);
+    setUpdateError(null);
+    try {
+      setDesktopUpdateStatus(await downloadDesktopUpdate());
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : "更新下载失败。");
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    setUpdateLoading(true);
+    setUpdateError(null);
+    try {
+      setDesktopUpdateStatus(await installDesktopUpdate());
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : "更新安装失败。");
     } finally {
       setUpdateLoading(false);
     }
@@ -297,7 +336,9 @@ export function SettingsPage() {
         <Card>
           <CardHeader
             title="应用更新"
-            subtitle="检查 GitHub Release；桌面端会打开系统浏览器下载。"
+            subtitle={hasDesktopUpdater()
+              ? "检查到新版本后，由你确认下载并重启安装。"
+              : "网页与便携版仍从 GitHub Release 获取安装包。"}
             action={<Badge tone="neutral">v{CURRENT_APP_VERSION}</Badge>}
           />
           <div className="space-y-3">
@@ -306,13 +347,37 @@ export function SettingsPage() {
                 <IconRefresh size={15} className={updateLoading ? "animate-spin" : undefined} />
                 {updateLoading ? "检查中" : "检查更新"}
               </Button>
-              {(updateResult?.status === "available" || updateResult?.status === "unavailable") && (
+              {hasDesktopUpdater() && desktopUpdateStatus?.state === "available" && (
+                <Button onClick={handleDownloadUpdate} disabled={updateLoading}>
+                  <IconUpload size={15} />
+                  下载更新
+                </Button>
+              )}
+              {hasDesktopUpdater() && desktopUpdateStatus?.state === "downloaded" && (
+                <Button onClick={handleInstallUpdate} disabled={updateLoading}>
+                  <IconCheck size={15} />
+                  重启并安装
+                </Button>
+              )}
+              {!hasDesktopUpdater() && (updateResult?.status === "available" || updateResult?.status === "unavailable") && (
                 <Button onClick={handleOpenRelease}>
                   <IconUpload size={15} />
                   打开发布页
                 </Button>
               )}
             </div>
+            {desktopUpdateStatus && (
+              <StateMessage kind={desktopUpdateStatus.state === "error" ? "error" : "info"}>
+                {desktopUpdateStatus.state === "checking" && "正在检查更新。"}
+                {desktopUpdateStatus.state === "available" && `已发现 ${desktopUpdateStatus.version ?? ""}，请确认下载。`}
+                {desktopUpdateStatus.state === "not-available" && "当前已是最新版本。"}
+                {desktopUpdateStatus.state === "downloading" && `正在下载${desktopUpdateStatus.percent === undefined ? "" : ` ${desktopUpdateStatus.percent}%`}。`}
+                {desktopUpdateStatus.state === "downloaded" && "下载完成，请确认重启并安装。"}
+                {desktopUpdateStatus.state === "installing" && "正在重启并安装更新。"}
+                {desktopUpdateStatus.state === "unsupported" && (desktopUpdateStatus.message ?? "请使用 Windows 安装版获得自动更新。")}
+                {desktopUpdateStatus.state === "error" && (desktopUpdateStatus.message ?? "更新失败，请稍后再试。")}
+              </StateMessage>
+            )}
             {updateResult && <StateMessage kind="info">{updateResult.message}</StateMessage>}
             {updateError && <StateMessage kind="error">{updateError}</StateMessage>}
           </div>

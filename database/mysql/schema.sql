@@ -13,6 +13,14 @@ CREATE TABLE IF NOT EXISTS users (
     deleted_at DATETIME NULL COMMENT '软删除时间'
 ) COMMENT='用户表';
 
+CREATE TABLE IF NOT EXISTS sa_token_store (
+    store_key VARCHAR(255) PRIMARY KEY COMMENT 'Sa-Token 内部键',
+    value_type VARCHAR(16) NOT NULL COMMENT 'STRING 或 OBJECT',
+    value_data LONGTEXT NOT NULL COMMENT '字符串或 Base64 Java 序列化会话',
+    expires_at DATETIME NULL COMMENT 'NULL 表示永不过期',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) COMMENT='持久化 Sa-Token 会话表';
+
 CREATE TABLE IF NOT EXISTS projects (
     id VARCHAR(64) PRIMARY KEY COMMENT '学习项目 ID',
     user_id VARCHAR(64) NOT NULL COMMENT '所属用户 ID',
@@ -88,6 +96,8 @@ CREATE TABLE IF NOT EXISTS habit_checkins (
 CREATE TABLE IF NOT EXISTS focus_sessions (
     id VARCHAR(64) PRIMARY KEY COMMENT '专注记录 ID',
     task_id VARCHAR(64) NULL COMMENT '关联任务 ID',
+    user_id VARCHAR(64) NULL COMMENT '所属用户 ID',
+    project_id VARCHAR(64) NULL COMMENT '所属项目 ID',
     started_at DATETIME NOT NULL COMMENT '开始时间',
     duration_minutes INT NOT NULL COMMENT '专注时长分钟数',
     completed BOOLEAN NOT NULL DEFAULT FALSE COMMENT '是否完成完整番茄时段',

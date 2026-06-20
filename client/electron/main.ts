@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, Menu, shell, type WebContents } from "electron";
+import { autoUpdater, type UpdateInfo } from "electron-updater";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -6,6 +7,118 @@ const isDevelopment = !app.isPackaged;
 const MIN_ZOOM_FACTOR = 0.75;
 const MAX_ZOOM_FACTOR = 1.7;
 const ZOOM_STEP = 0.1;
+
+type DesktopUpdateStatus = {
+  state:
+    | "checking"
+    | "available"
+    | "not-available"
+    | "downloading"
+    | "downloaded"
+    | "installing"
+    | "unsupported"
+    | "error";
+  version?: string;
+  percent?: number;
+  message?: string;
+  releaseNotes?: string;
+};
+
+let updaterConfigured = false;
+
+function isNativeUpdaterSupported() {
+  return app.isPackaged && process.platform === "win32";
+}
+
+function emitUpdateStatus(status: DesktopUpdateStatus) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send("chronos:update-status", status);
+  }
+}
+
+function normalizeReleaseNotes(releaseNotes: UpdateInfo["releaseNotes"]) {
+  if (Array.isArray(releaseNotes)) {
+    return releaseNotes.map((note) => note.note).filter(Boolean).join("\n\n");
+  }
+
+  return releaseNotes ?? undefined;
+}
+
+function configureAutoUpdater() {
+  if (!isNativeUpdaterSupported()) {
+    return false;
+  }
+
+  if (updaterConfigured) {
+    return true;
+  }
+
+  updaterConfigured = true;
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+
+  autoUpdater.on("checking-for-update", () => {
+    emitUpdateStatus({ state: "checking" });
+  });
+  autoUpdater.on("update-available", (info) => {
+    emitUpdateStatus({
+      state: "available",
+      version: info.version,
+      releaseNotes: normalizeReleaseNotes(info.releaseNotes),
+    });
+  });
+  autoUpdater.on("update-not-available", () => {
+    emitUpdateStatus({ state: "not-available" });
+  });
+  autoUpdater.on("download-progress", (progress) => {
+    emitUpdateStatus({
+      state: "downloading",
+      percent: Math.round(progress.percent),
+    });
+  });
+  autoUpdater.on("update-downloaded", (info) => {
+    emitUpdateStatus({
+      state: "downloaded",
+      version: info.version,
+      releaseNotes: normalizeReleaseNotes(info.releaseNotes),
+    });
+  });
+  autoUpdater.on("error", (error) => {
+    emitUpdateStatus({ state: "error", message: error.message });
+  });
+
+  return true;
+}
+
+async function checkNativeUpdate(): Promise<DesktopUpdateStatus> {
+  if (!configureAutoUpdater()) {
+    return { state: "unsupported", message: "Automatic updates require the Windows installer." };
+  }
+
+  emitUpdateStatus({ state: "checking" });
+  await autoUpdater.checkForUpdates();
+  return { state: "checking" };
+}
+
+async function downloadNativeUpdate(): Promise<DesktopUpdateStatus> {
+  if (!configureAutoUpdater()) {
+    return { state: "unsupported", message: "Automatic updates require the Windows installer." };
+  }
+
+  emitUpdateStatus({ state: "downloading", percent: 0 });
+  await autoUpdater.downloadUpdate();
+  return { state: "downloading", percent: 0 };
+}
+
+function installNativeUpdate(): DesktopUpdateStatus {
+  if (!configureAutoUpdater()) {
+    return { state: "unsupported", message: "Automatic updates require the Windows installer." };
+  }
+
+  emitUpdateStatus({ state: "installing" });
+  setImmediate(() => autoUpdater.quitAndInstall());
+  return { state: "installing" };
+}
 
 function resolveAssetPath(fileName: string) {
   const candidates = [
@@ -64,6 +177,10 @@ function registerDesktopIpc() {
 
     await shell.openExternal(target.toString());
   });
+
+  ipcMain.handle("chronos:update:check", () => checkNativeUpdate());
+  ipcMain.handle("chronos:update:download", () => downloadNativeUpdate());
+  ipcMain.handle("chronos:update:install", () => installNativeUpdate());
 }
 
 function createMainWindow() {
@@ -110,6 +227,9 @@ app.whenReady().then(() => {
   registerDesktopIpc();
   Menu.setApplicationMenu(null);
   createMainWindow();
+  setTimeout(() => {
+    void checkNativeUpdate();
+  }, 15_000);
 });
 
 app.on("activate", () => {

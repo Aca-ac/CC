@@ -49,6 +49,8 @@ public class ProjectService extends ServiceImpl<ProjectMapper, Project>  {
         project.setGoal(request.goal());
         project.setStartDate(request.startDate());
         project.setEndDate(request.endDate());
+        project.setStatus("ACTIVE");
+        project.setProgress(0);
 
 
         project.setUserId(currentUserId);
@@ -71,4 +73,3 @@ public class ProjectService extends ServiceImpl<ProjectMapper, Project>  {
 
 
 }
-

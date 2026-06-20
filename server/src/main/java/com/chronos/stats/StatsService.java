@@ -176,12 +176,26 @@ public class StatsService {
                                 .between(Task::getUpdatedAt, weekStartDateTime, weekEndDateTime)
                 ).intValue();
 
-                if (projTotal > 0) {
+                int projFocusMinutes = focusSessionMapper.selectList(
+                        new LambdaQueryWrapper<FocusSession>()
+                                .eq(FocusSession::getUserId, userId)
+                                .eq(FocusSession::getProjectId, pId)
+                                .between(FocusSession::getStartedAt, weekStartDateTime, weekEndDateTime)
+                ).stream().mapToInt(session -> session.getDurationMinutes() != null ? session.getDurationMinutes() : 0).sum();
+                int projLogMinutes = learningLogMapper.selectList(
+                        new LambdaQueryWrapper<LearningLog>()
+                                .eq(LearningLog::getProjectId, pId)
+                                .between(LearningLog::getCreatedAt, weekStartDateTime, weekEndDateTime)
+                ).stream().mapToInt(log -> log.getActualMinutes() != null ? log.getActualMinutes() : 0).sum();
+                int projMinutes = projFocusMinutes + projLogMinutes;
+
+                if (projTotal > 0 || projMinutes > 0) {
                     projectDistribution.add(new WeeklyStatsResponse.ProjectStats(
                             pId,
                             projectNameMap.getOrDefault(pId, "未知项目"),
                             projTotal,
-                            projCompleted
+                            projCompleted,
+                            projMinutes
                     ));
                 }
             }
@@ -198,6 +212,7 @@ public class StatsService {
 
             int dayCompletedTasks = 0;
             int dayFocusMinutes = 0;
+            int dayLogMinutes = 0;
             int dayCheckins;
 
             if (!projectIds.isEmpty()) {
@@ -218,6 +233,11 @@ public class StatsService {
                 dayFocusMinutes = daySessionsByUser.stream()
                         .mapToInt(s -> s.getDurationMinutes() != null ? s.getDurationMinutes() : 0)
                         .sum();
+                dayLogMinutes = learningLogMapper.selectList(
+                        new LambdaQueryWrapper<LearningLog>()
+                                .in(LearningLog::getProjectId, projectIds)
+                                .between(LearningLog::getCreatedAt, dayStart, dayEnd)
+                ).stream().mapToInt(log -> log.getActualMinutes() != null ? log.getActualMinutes() : 0).sum();
             }
 
             if (!userHabitIds.isEmpty()) {
@@ -234,7 +254,8 @@ public class StatsService {
                     date.format(dateFormatter),
                     dayCompletedTasks,
                     dayFocusMinutes,
-                    dayCheckins
+                    dayCheckins,
+                    dayFocusMinutes + dayLogMinutes
             ));
         }
 

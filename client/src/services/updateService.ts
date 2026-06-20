@@ -7,6 +7,24 @@ export const CURRENT_APP_VERSION =
 
 export type UpdateStatus = "available" | "current" | "unavailable";
 
+export type DesktopUpdateState =
+  | "checking"
+  | "available"
+  | "not-available"
+  | "downloading"
+  | "downloaded"
+  | "installing"
+  | "unsupported"
+  | "error";
+
+export interface DesktopUpdateStatus {
+  state: DesktopUpdateState;
+  version?: string;
+  percent?: number;
+  message?: string;
+  releaseNotes?: string;
+}
+
 export interface UpdateCheckResult {
   status: UpdateStatus;
   currentVersion: string;
@@ -107,6 +125,37 @@ export async function checkForUpdates({
       ? `Version ${latestVersion} is available. Open the release page to download it.`
       : "You are already using the latest version.",
   };
+}
+
+export function hasDesktopUpdater() {
+  return Boolean(window.chronosDesktop?.updates);
+}
+
+export async function checkDesktopUpdate(): Promise<DesktopUpdateStatus> {
+  const updater = window.chronosDesktop?.updates;
+  if (!updater) {
+    throw new Error("Desktop updater is unavailable in this environment.");
+  }
+
+  return updater.check();
+}
+
+export async function downloadDesktopUpdate(): Promise<DesktopUpdateStatus> {
+  const updater = window.chronosDesktop?.updates;
+  if (!updater) {
+    throw new Error("Desktop updater is unavailable in this environment.");
+  }
+
+  return updater.download();
+}
+
+export async function installDesktopUpdate(): Promise<DesktopUpdateStatus> {
+  const updater = window.chronosDesktop?.updates;
+  if (!updater) {
+    throw new Error("Desktop updater is unavailable in this environment.");
+  }
+
+  return updater.install();
 }
 
 export async function openReleasePage(url: string) {
