@@ -14,6 +14,7 @@ import {
   CardHeader,
   Field,
   Input,
+  Modal,
   PageHeader,
   Select,
   StateMessage,
@@ -22,6 +23,7 @@ import {
 import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
 import { apiClient, type AiSettingsItem } from "../services/apiClient";
+import { deleteDB } from "../storage/db";
 import {
   CURRENT_APP_VERSION,
   checkDesktopUpdate,
@@ -57,6 +59,11 @@ export function SettingsPage() {
   const [desktopUpdateStatus, setDesktopUpdateStatus] = useState<DesktopUpdateStatus | null>(null);
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const aiManageable = Boolean(session) && !offline;
   const providerMeta = AI_PROVIDERS.find((item) => item.code === aiProvider);
@@ -178,6 +185,29 @@ export function SettingsPage() {
     await openReleasePage(updateResult?.releaseUrl ?? "https://github.com/Vincent-Ctrl-18/Chronos/releases");
   };
 
+  const handleDeleteAccount = async () => {
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await apiClient.deleteAccount();
+      // 清理本地缓存与离线数据，避免下个账号看到残留
+      try {
+        await deleteDB();
+      } catch {
+        /* 忽略本地清理失败 */
+      }
+      ["chronos:habitChecked", "chronos:aiBreakdownDraft", "chronos_stats_cache"].forEach((key) =>
+        localStorage.removeItem(key),
+      );
+      setDeleteOpen(false);
+      logout(); // 会话清空后自动跳回登录页
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -219,10 +249,26 @@ export function SettingsPage() {
                   <p className="truncate text-[0.8rem] text-muted">{session.email}</p>
                 </div>
               </div>
-              <Button variant="secondary" onClick={logout}>
-                <IconLogout size={15} />
-                退出登录
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="secondary" onClick={logout}>
+                  <IconLogout size={15} />
+                  退出登录
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="text-danger hover:bg-danger-soft"
+                  onClick={() => {
+                    setDeleteConfirm("");
+                    setDeleteError(null);
+                    setDeleteOpen(true);
+                  }}
+                  disabled={offline}
+                  title={offline ? "离线模式下无法注销账号" : undefined}
+                >
+                  <IconTrash size={15} />
+                  注销账号
+                </Button>
+              </div>
             </div>
           ) : (
             <StateMessage>当前为本地演示模式，登录后可同步数据并配置 AI 服务。</StateMessage>
@@ -357,6 +403,44 @@ export function SettingsPage() {
           {updateError && <StateMessage kind="error">{updateError}</StateMessage>}
         </div>
       </Card>
+
+      {/* 注销账号确认 */}
+      <Modal
+        open={deleteOpen}
+        onClose={() => !deleteBusy && setDeleteOpen(false)}
+        title="注销账号"
+        subtitle="此操作将永久删除你的账号及全部数据，且不可恢复。"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeleteOpen(false)} disabled={deleteBusy}>
+              取消
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteAccount}
+              disabled={deleteBusy || deleteConfirm.trim() !== "注销"}
+            >
+              <IconTrash size={15} />
+              {deleteBusy ? "注销中…" : "永久注销"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <StateMessage kind="error">
+            项目、任务、学习日志、专注记录、习惯打卡与 AI 设置都会被一并删除，无法找回。
+          </StateMessage>
+          <Field label="请输入「注销」以确认">
+            <Input
+              value={deleteConfirm}
+              onChange={(event) => setDeleteConfirm(event.target.value)}
+              placeholder="注销"
+              aria-label="注销确认"
+            />
+          </Field>
+          {deleteError && <StateMessage kind="error">{deleteError}</StateMessage>}
+        </div>
+      </Modal>
     </div>
   );
 }

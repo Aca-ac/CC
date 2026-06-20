@@ -196,6 +196,8 @@ export const apiClient = {
 
   logout: () => request<void>("/auth/logout", { method: "POST" }),
 
+  deleteAccount: () => request<void>("/auth/account", { method: "DELETE" }),
+
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(body) }),
   postWithHeaders: <T>(path: string, body: unknown, headers: Record<string, string>) =>

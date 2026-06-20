@@ -135,3 +135,10 @@
 - 改动目的：按用户本轮 9 项要求完善前端设计与多项功能，并修复 release 缺少 NSIS 安装包的问题。
 - 验证结果：前端 `npm run build --workspace client` 通过；`cd client && npx vitest run` 全绿（25 文件 / 68 测试）；后端 `.\server\mvnw.cmd test` 全绿（67 测试 0 失败，含 AiSettings 8 / AiBreakdown 6 / AiProvider 8）；Playwright 实机核对日历周视图深/浅主题（青蓝主题、今日列高亮、优先级色条、导入下拉不再裁剪、前后切换可用）。
 - 判断与待办：「账号注销」按口语习惯实现为「退出登录」（非删除账号）；自定义模型名落库需线上库迁移，已用启动幂等 `ALTER` 自动补列，无需手工 SQL；按用户要求移除设置页「服务 API 地址」展示（地址仍可经构建环境变量/本地存储配置）；`#9` 仅改打包配置，真正出包需重新发布版本（打 tag）由用户确认后进行；网页版需经 CD（合并到 main）部署方可在线生效。
+
+## 2026-06-20 收尾阶段 5b（注销账号 + 2.0.0 发布）
+
+- 改动文件：`server/.../auth/{AuthController,AuthService}.java`（新增 `DELETE /api/auth/account`：按外键依赖顺序硬删除当前用户的习惯/打卡/AI 建议/AI 设置/专注记录/学习日志/任务/同步记录/项目，最后删 users 并 `StpUtil.logout()`；任务自引用先置空 parent_task_id 再删）、`server/.../auth/AuthServiceTests.java`（新增：播种用户 A 全量数据 + 用户 B 项目，注销后断言 A 数据全清、B 保留）、`client/src/services/apiClient.ts`（`deleteAccount()`）、`client/src/pages/SettingsPage.tsx`（账号卡片新增「注销账号」危险操作 + 二次确认弹窗，需输入「注销」；成功后清本地 IndexedDB 与缓存并退出登录）、`client/package.json`（版本 1.0.1 → 2.0.0，`__APP_VERSION__` 随之更新）。
+- 改动目的：按用户要求把「注销」实现为永久删除账号及全部数据（区别于「退出登录」）；并将本轮全部改动作为 2.0.0 发布。
+- 验证结果：前端 `npm run build --workspace client` 通过；后端 `AuthServiceTests` 通过（1/0/0）。
+- 发布：提交 PR 至 main（用户负责合并 → 触发 CD 部署网页版），推送 `v2.0.0` tag 触发 `windows-installer.yml` 出包并 `gh release create`（含修好命名后的 NSIS 安装包 + latest.yml）。
