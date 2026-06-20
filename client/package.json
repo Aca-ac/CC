@@ -9,7 +9,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -p tsconfig.app.json && vite build && tsc -p electron/tsconfig.json",
     "clean:release": "node -e \"require('fs').rmSync('release',{recursive:true,force:true})\"",
-    "dist:win": "npm run clean:release && npm run build && electron-builder --win nsis portable",
+    "dist:win": "npm run clean:release && npm run build && electron-builder --win nsis portable --publish never",
     "electron:start": "wait-on tcp:5173 && tsc -p electron/tsconfig.json && electron dist-electron/main.js",
     "electron:dev": "concurrently \"npm:dev\" \"npm:electron:start\"",
     "preview": "vite preview"
