@@ -90,12 +90,12 @@ export async function checkForUpdates({
       status: "unavailable",
       currentVersion,
       releaseUrl: RELEASES_URL,
-      message: "No published release was found yet. Open the releases page to check installers later.",
+      message: "暂未发布任何版本，可稍后到发布页查看安装包。",
     };
   }
 
   if (!response.ok) {
-    throw new Error(`Update check failed: HTTP ${response.status} ${response.statusText}`);
+    throw new Error(`检查更新失败：HTTP ${response.status} ${response.statusText}`);
   }
 
   const release = (await response.json()) as GitHubRelease;
@@ -106,7 +106,7 @@ export async function checkForUpdates({
       status: "unavailable",
       currentVersion,
       releaseUrl: release.html_url ?? RELEASES_URL,
-      message: "The latest release does not include a version tag. Open the releases page to verify manually.",
+      message: "最新发布缺少版本号，请到发布页手动确认。",
     };
   }
 
@@ -122,8 +122,8 @@ export async function checkForUpdates({
     publishedAt: release.published_at,
     notes: release.body,
     message: isNewer
-      ? `Version ${latestVersion} is available. Open the release page to download it.`
-      : "You are already using the latest version.",
+      ? `发现新版本 ${latestVersion}，可前往发布页下载。`
+      : "当前已是最新版本。",
   };
 }
 
@@ -134,7 +134,7 @@ export function hasDesktopUpdater() {
 export async function checkDesktopUpdate(): Promise<DesktopUpdateStatus> {
   const updater = window.chronosDesktop?.updates;
   if (!updater) {
-    throw new Error("Desktop updater is unavailable in this environment.");
+    throw new Error("当前环境不支持桌面自动更新。");
   }
 
   return updater.check();
@@ -143,7 +143,7 @@ export async function checkDesktopUpdate(): Promise<DesktopUpdateStatus> {
 export async function downloadDesktopUpdate(): Promise<DesktopUpdateStatus> {
   const updater = window.chronosDesktop?.updates;
   if (!updater) {
-    throw new Error("Desktop updater is unavailable in this environment.");
+    throw new Error("当前环境不支持桌面自动更新。");
   }
 
   return updater.download();
@@ -152,7 +152,7 @@ export async function downloadDesktopUpdate(): Promise<DesktopUpdateStatus> {
 export async function installDesktopUpdate(): Promise<DesktopUpdateStatus> {
   const updater = window.chronosDesktop?.updates;
   if (!updater) {
-    throw new Error("Desktop updater is unavailable in this environment.");
+    throw new Error("当前环境不支持桌面自动更新。");
   }
 
   return updater.install();

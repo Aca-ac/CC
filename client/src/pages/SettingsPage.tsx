@@ -119,7 +119,7 @@ export function SettingsPage() {
   const handleSaveAi = async () => {
     const key = keyInput.trim();
     if (key.length < 8) {
-      setAiError("API Key 至少需要 8 个字符。");
+      setAiError("API 密钥至少需要 8 个字符。");
       return;
     }
     setAiBusy(true);
@@ -128,7 +128,7 @@ export function SettingsPage() {
       await apiClient.updateAiSettings({ provider: aiProvider, apiKey: key, isCustom: true });
       setKeyInput("");
       await refreshAiSettings();
-      flash("AI Key 已加密保存到服务端");
+      flash("API 密钥已加密保存到服务端");
     } catch (err) {
       setAiError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -142,7 +142,7 @@ export function SettingsPage() {
     try {
       await apiClient.deleteAiSettings(aiProvider);
       await refreshAiSettings();
-      flash("已删除该 provider 的 Key");
+      flash("已删除该服务商的密钥");
     } catch (err) {
       setAiError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -198,7 +198,7 @@ export function SettingsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Settings"
+        eyebrow="偏好设置"
         title="系统设置"
         description="配置外观、后端地址、AI 服务和桌面更新策略。"
         actions={
@@ -231,10 +231,10 @@ export function SettingsPage() {
             action={<Badge tone="info">{apiBaseUrl || "/api"}</Badge>}
           />
           <div className="grid gap-3">
-            <Field label="API base URL" hint="留空会回到 /api。">
+            <Field label="服务地址" hint="留空会回到 /api。">
               <Input
                 type="text"
-                aria-label="API base URL"
+                aria-label="服务地址"
                 value={urlInput}
                 onChange={(event) => setUrlInput(event.target.value)}
                 placeholder="https://vincentt.xyz/chronos/api"
@@ -257,19 +257,19 @@ export function SettingsPage() {
 
       <Card>
         <CardHeader
-          title="AI 服务（BYOK）"
-          subtitle="自带 Key 经服务端 AES-GCM 加密保存；未配置时后端使用内置 Mock。"
+          title="AI 服务（自带密钥）"
+          subtitle="自带密钥经服务端 AES-GCM 加密保存；未配置时后端使用内置模拟回复。"
           action={
             currentMaskedKey ? (
               <Badge tone="success">{currentMaskedKey}</Badge>
             ) : (
-              <Badge tone="neutral">未配置 Key</Badge>
+              <Badge tone="neutral">未配置密钥</Badge>
             )
           }
         />
         <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)]">
           <div className="space-y-3">
-            <Field label="Provider">
+            <Field label="服务商">
               <Select value={aiProvider} onChange={(event) => setAiProvider(event.target.value)}>
                 {AI_PROVIDERS.map((provider) => (
                   <option key={provider.code} value={provider.code}>
@@ -280,7 +280,7 @@ export function SettingsPage() {
             </Field>
 
             <Field
-              label="API Key"
+              label="API 密钥"
               hint={currentMaskedKey ? `当前已配置：${currentMaskedKey}` : "仅在线登录后可配置（HTTPS 环境）。"}
             >
               <Input
@@ -289,14 +289,14 @@ export function SettingsPage() {
                 onChange={(event) => setKeyInput(event.target.value)}
                 placeholder="sk-..."
                 disabled={!aiManageable || aiBusy}
-                aria-label="AI API Key"
+                aria-label="API 密钥"
               />
             </Field>
 
             <div className="flex flex-wrap items-center gap-2">
               <Button onClick={handleSaveAi} disabled={!aiManageable || aiBusy}>
                 <IconCheck size={15} />
-                保存 Key
+                保存密钥
               </Button>
               <Button
                 variant="secondary"
@@ -304,7 +304,7 @@ export function SettingsPage() {
                 disabled={!aiManageable || aiBusy || !currentMaskedKey}
               >
                 <IconTrash size={15} />
-                删除 Key
+                删除密钥
               </Button>
             </div>
           </div>
@@ -316,15 +316,15 @@ export function SettingsPage() {
                 <div className="min-w-0">
                   <p className="text-[0.9rem] font-medium text-ink">调用策略</p>
                   <p className="mt-1 text-[0.82rem] leading-relaxed text-muted">
-                    拆解与复盘优先使用所选 provider 的加密 Key；服务端按部署配置选择启用的 provider，
-                    无可用 Key 时回落内置 Mock，核心流程不受影响。
+                    拆解与复盘优先使用所选服务商的加密密钥；服务端按部署配置选择启用的服务商，
+                    无可用密钥时回落到内置模拟回复，核心流程不受影响。
                   </p>
                 </div>
               </div>
             </div>
 
             {!aiManageable && (
-              <StateMessage>登录在线后可配置 AI Key（Key 加密存储于服务端，不写入本机）。</StateMessage>
+              <StateMessage>登录在线后可配置 API 密钥（密钥加密存储于服务端，不写入本机）。</StateMessage>
             )}
             {aiError && <StateMessage kind="error">{aiError}</StateMessage>}
             {saveMsg && <StateMessage>{saveMsg}</StateMessage>}

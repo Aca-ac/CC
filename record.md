@@ -105,3 +105,10 @@
 - 改动目的：完成阶段 3 的 P0 校验与 P1 新增（习惯打卡 + 成就、Markdown 日志、AI 拆解/复盘真实调用 + BYOK），并校验 Electron 打包与 release 链路。
 - 验证结果（阶段 3 验收）：后端 `.\server\mvnw.cmd test` BUILD SUCCESS，61 测试 0 失败（含 Habit 3 / AiBreakdown 6 / AiSettings 8 / Sync 2 等）；前端 `npm run build --workspace client` 通过（产出 `dist/` + `dist-electron/{main,preload}.js`），`cd client && npx vitest run` 全绿（24 文件 / 63 测试，其中 `useHabits` 5、`MarkdownView` 4、`useAiAdvice` 2 为本阶段新增）；`electron-builder` 能加载配置、执行 `@electron/rebuild`、下载并解压 Electron 42。CI（`.github/workflows/ci.yml`）三 job 自阶段 1 起已启用。
 - 已知限制：本机 `npm run dist:win` 在解压 Electron 后于 `release\win-unpacked.tmp → win-unpacked` 目录重命名处报 `EPERM`（Windows 实时杀毒/文件锁占用新解压的 `electron.exe`，禁用沙箱后复现，属本机环境限制而非工程缺陷）；安装包以 CI `windows-installer.yml`（`windows-latest` 干净环境、推 `v*.*.*` tag 触发）为权威产出路径。习惯「今日是否已打卡」后端列表未返回，前端用会话内集合追踪（打卡接口幂等）。BYOK 仅托管各 provider 加密 Key，endpoint/model 由服务端部署配置决定。
+
+## 2026-06-20 收尾阶段 4（侧栏定型 + 统计崩溃修复 + 可视化扩展 + 文案中文化）
+
+- 改动文件：`client/src/components/AppLayout.tsx`+`__tests__/AppLayout.test.tsx`（桌面侧栏由「悬停展开」改为固定 72px 窄栏，悬停图标浮出自绘 tooltip，移动端抽屉不变；测试改用无障碍标签查询）、`client/src/pages/StatsPage.tsx`+`__tests__/StatsPage.test.tsx`+`client/src/hooks/useStats.ts`+`client/src/services/statsService.ts`（修复「统计复盘」页因旧版本过期缓存缺数组字段导致 `reduce` 崩溃：StatsPage 数组访问空值兜底、useStats 校验并清除不兼容缓存、新增回归测试；新增「时间构成」环形图与「项目进度」条形图，statsService 透传 focusMinutes/totalTasks/completedTasks，无需改后端）、`client/src/pages/HabitsPage.tsx`（依据连续天数还原最近 21 天打卡热力格）、`client/src/pages/{AiBreakdownPage,CalendarPage,LearningLogsPage,ProjectsPage,TasksPage}.tsx`（英文 eyebrow 改中文）、`client/src/pages/SettingsPage.tsx`+`__tests__/SettingsPage.test.tsx`（Provider/Key/BYOK/Mock/base URL 等英文改中文）、`client/src/services/updateService.ts`+`client/electron/main.ts`（更新提示英文文案改中文）。
+- 改动目的：按用户要求收尾——固定窄侧栏 + 悬停文字提示、统计页可视化扩展（习惯热力格 + 时间构成 + 项目进度）、面向用户的中文文案规整；并修复统计页一打开即崩溃的线上问题。
+- 验证结果：`npx tsc -p tsconfig.app.json --noEmit` 与 `electron/tsconfig.json` 均通过；`cd client && npx vitest run` 全绿（25 文件 / 68 测试，新增统计页崩溃回归 1 项）。
+- 已知限制：习惯热力格仅由 streakCount 还原（后端暂无逐日打卡历史端点），展示的是「最近连续打卡」而非真实逐日记录，如需真实多周历史需新增后端 `GET /habits/{id}/checkins` 并重新部署；统计页崩溃同样存在于已部署网页版（main 分支同源），需重新部署前端方可在线上修复。

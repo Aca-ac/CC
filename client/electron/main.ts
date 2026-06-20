@@ -92,7 +92,7 @@ function configureAutoUpdater() {
 
 async function checkNativeUpdate(): Promise<DesktopUpdateStatus> {
   if (!configureAutoUpdater()) {
-    return { state: "unsupported", message: "Automatic updates require the Windows installer." };
+    return { state: "unsupported", message: "自动更新需要使用 Windows 安装版。" };
   }
 
   emitUpdateStatus({ state: "checking" });
@@ -102,7 +102,7 @@ async function checkNativeUpdate(): Promise<DesktopUpdateStatus> {
 
 async function downloadNativeUpdate(): Promise<DesktopUpdateStatus> {
   if (!configureAutoUpdater()) {
-    return { state: "unsupported", message: "Automatic updates require the Windows installer." };
+    return { state: "unsupported", message: "自动更新需要使用 Windows 安装版。" };
   }
 
   emitUpdateStatus({ state: "downloading", percent: 0 });
@@ -112,7 +112,7 @@ async function downloadNativeUpdate(): Promise<DesktopUpdateStatus> {
 
 function installNativeUpdate(): DesktopUpdateStatus {
   if (!configureAutoUpdater()) {
-    return { state: "unsupported", message: "Automatic updates require the Windows installer." };
+    return { state: "unsupported", message: "自动更新需要使用 Windows 安装版。" };
   }
 
   emitUpdateStatus({ state: "installing" });

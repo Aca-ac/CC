@@ -405,7 +405,7 @@ export function TasksPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Tasks"
+        eyebrow="待办清单"
         title="任务管理"
         description="按项目、状态、标签和优先级整理学习任务。"
         actions={

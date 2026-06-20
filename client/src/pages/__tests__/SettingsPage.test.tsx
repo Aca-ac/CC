@@ -26,7 +26,7 @@ describe("SettingsPage", () => {
       expect(screen.getByText("系统设置")).toBeDefined();
     });
 
-    fireEvent.change(screen.getByLabelText("API base URL"), {
+    fireEvent.change(screen.getByLabelText("服务地址"), {
       target: { value: "http://localhost:8080/api" },
     });
     fireEvent.click(screen.getByText("保存 API 地址"));
