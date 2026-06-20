@@ -16,6 +16,8 @@ public class SyncSchemaInitializer {
         return args -> {
             apply(jdbcTemplate, "ALTER TABLE sync_records ADD COLUMN user_id VARCHAR(64) NOT NULL DEFAULT 'legacy'");
             apply(jdbcTemplate, "CREATE INDEX idx_sync_records_user_cursor ON sync_records(user_id, version, id)");
+            // 自定义 AI 模型名：旧库无该列时补齐（幂等，已存在则忽略）。
+            apply(jdbcTemplate, "ALTER TABLE ai_settings ADD COLUMN model VARCHAR(128) NULL");
         };
     }
 

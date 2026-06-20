@@ -7,5 +7,6 @@ public record AiSettingsResponse(
         String provider,
         boolean isCustom,
         String maskedKey,
+        String model,
         LocalDateTime updatedAt
 ) {}

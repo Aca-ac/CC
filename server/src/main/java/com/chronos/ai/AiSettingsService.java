@@ -87,11 +87,14 @@ public class AiSettingsService {
                         .eq(AiSettings::getProvider, request.provider())
         );
 
+        String model = normalizeModel(request.model());
+
         if (existing != null) {
             // 更新
             existing.setEncryptedKey(encryptedKey);
             existing.setIsCustom(request.isCustom());
             existing.setMaskedKey(maskedKey);
+            existing.setModel(model);
             existing.setUpdatedAt(LocalDateTime.now());
             aiSettingsMapper.updateById(existing);
             return toResponse(existing);
@@ -104,6 +107,7 @@ public class AiSettingsService {
             settings.setEncryptedKey(encryptedKey);
             settings.setIsCustom(request.isCustom());
             settings.setMaskedKey(maskedKey);
+            settings.setModel(model);
             settings.setCreatedAt(LocalDateTime.now());
             settings.setUpdatedAt(LocalDateTime.now());
             aiSettingsMapper.insert(settings);
@@ -126,6 +130,29 @@ public class AiSettingsService {
             throw new NotFoundException("未找到指定 provider 的 AI 设置: " + provider);
         }
         aiSettingsMapper.deleteById(existing.getId());
+    }
+
+    /**
+     * 获取用户为指定 provider 指定的模型名（供 Provider Factory 使用）；未配置返回 null。
+     */
+    public String getModel(String userId, String provider) {
+        AiSettings settings = aiSettingsMapper.selectOne(
+                new LambdaQueryWrapper<AiSettings>()
+                        .eq(AiSettings::getUserId, userId)
+                        .eq(AiSettings::getProvider, provider)
+        );
+        if (settings == null) {
+            return null;
+        }
+        return normalizeModel(settings.getModel());
+    }
+
+    private String normalizeModel(String model) {
+        if (model == null) {
+            return null;
+        }
+        String trimmed = model.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /**
@@ -251,6 +278,7 @@ public class AiSettingsService {
                 settings.getProvider(),
                 Boolean.TRUE.equals(settings.getIsCustom()),
                 settings.getMaskedKey(),
+                settings.getModel(),
                 settings.getUpdatedAt()
         );
     }

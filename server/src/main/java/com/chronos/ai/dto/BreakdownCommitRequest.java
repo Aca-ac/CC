@@ -4,6 +4,7 @@ import com.chronos.enums.Priority;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -26,6 +27,13 @@ public record BreakdownCommitRequest(
             String description,
             int estimatedMinutes,
             Priority priority,
-            List<CommitTaskNode> subtasks
-    ) {}
+            List<CommitTaskNode> subtasks,
+            LocalDateTime dueTime
+    ) {
+        /** 向后兼容：不指定截止时间时默认 null。 */
+        public CommitTaskNode(String parentTaskId, String title, String description,
+                              int estimatedMinutes, Priority priority, List<CommitTaskNode> subtasks) {
+            this(parentTaskId, title, description, estimatedMinutes, priority, subtasks, null);
+        }
+    }
 }

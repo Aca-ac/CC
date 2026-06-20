@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS ai_settings (
     encrypted_key TEXT NOT NULL,
     is_custom BOOLEAN DEFAULT FALSE,
     masked_key VARCHAR(80),
+    model VARCHAR(128),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)

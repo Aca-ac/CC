@@ -49,33 +49,42 @@
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* ── Light theme (default) — 靛蓝 · 通透 · 暖意 ─────────────────── */
+/* ── Light theme (default) — 青蓝 · 通透 · 清爽 ─────────────────── */
 :root {
   color-scheme: light;
 
-  --surface: #F6F7FB;
+  --surface: #F4F8FB;
   --panel: #FFFFFF;
-  --panel-muted: #F1F3F9;
-  --text: #1A1E2C;
-  --muted: #6B7280;
-  --line: #E7EAF1;
+  --panel-muted: #EEF4F8;
+  --text: #0F2027;
+  --muted: #5B6B73;
+  --line: #DDE7ED;
 
-  /* 主色 - 靛蓝 indigo */
-  --accent: #4F46E5;
-  --accent-strong: #4338CA;
-  --accent-soft: #EEF2FF;
+  /* 主色 - 青蓝 cyan/teal */
+  --accent: #0891B2;
+  --accent-strong: #0E7490;
+  --accent-soft: #E0F6FB;
+
+  /* 装饰渐变端点：蓝 → 青（用于品牌标识、选中态、背景光晕） */
+  --grad-from: #0284C7;
+  --grad-to: #0B9FBD;
+  /* 实心强调面（按钮 / 选中态）上的前景色 */
+  --on-accent: #FFFFFF;
+  /* 跟随主色的投影（color-mix 保证浅/深主题都协调） */
+  --accent-shadow: color-mix(in srgb, var(--accent) 26%, transparent);
+  --accent-shadow-strong: color-mix(in srgb, var(--accent) 40%, transparent);
 
   /* 语义色 */
-  --success: #16A34A;
-  --success-soft: #ECFDF3;
+  --success: #0E9F6E;
+  --success-soft: #E7FBF3;
   --warning: #D97706;
   --warning-soft: #FFF7ED;
   --danger: #DC2626;
   --danger-soft: #FEF2F2;
   --info: #2563EB;
   --info-soft: #EFF6FF;
-  --focus: #7C3AED;       /* 专注紫 */
-  --focus-soft: #F5F3FF;
+  --focus: #6366F1;       /* 专注靛 */
+  --focus-soft: #EEF0FF;
   --habit: #EA580C;       /* 打卡橙 */
   --habit-soft: #FFF7ED;
 
@@ -102,29 +111,35 @@
 .dark {
   color-scheme: dark;
 
-  --surface: #0E0E10;
-  --panel: #17171A;
-  --panel-muted: #202024;
-  --text: #ECECEE;
-  --muted: #9A9AA2;
-  --line: #2A2A2E;
+  --surface: #07131A;
+  --panel: #0F1F28;
+  --panel-muted: #162C36;
+  --text: #E6F0F4;
+  --muted: #8FA3AC;
+  --line: #21323C;
 
-  --accent: #6366F1;
-  --accent-strong: #818CF8;
-  --accent-soft: #23232A;
+  --accent: #22D3EE;
+  --accent-strong: #67E8F9;
+  --accent-soft: #0C2B36;
+
+  --grad-from: #38BDF8;
+  --grad-to: #22D3EE;
+  --on-accent: #04222B;
+  --accent-shadow: color-mix(in srgb, var(--accent) 30%, transparent);
+  --accent-shadow-strong: color-mix(in srgb, var(--accent) 46%, transparent);
 
   --success: #34D399;
-  --success-soft: #1B241F;
+  --success-soft: #0F2A22;
   --warning: #FBBF24;
-  --warning-soft: #27231A;
+  --warning-soft: #2A2517;
   --danger: #F87171;
-  --danger-soft: #2A1C1E;
+  --danger-soft: #2E1A1C;
   --info: #60A5FA;
-  --info-soft: #1E232B;
+  --info-soft: #122231;
   --focus: #818CF8;
-  --focus-soft: #24242B;
+  --focus-soft: #1A1E33;
   --habit: #FB923C;
-  --habit-soft: #282016;
+  --habit-soft: #2A1F14;
 
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.6);
@@ -203,6 +218,66 @@ textarea {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ── Ambient background aurora（青蓝慢漂浮，克制不抢内容）──────── */
+.app-aurora {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.app-aurora::before,
+.app-aurora::after {
+  content: "";
+  position: absolute;
+  width: 46vw;
+  height: 46vw;
+  max-width: 720px;
+  max-height: 720px;
+  border-radius: 50%;
+  filter: blur(72px);
+  opacity: 0.5;
+  will-change: transform;
+}
+
+.app-aurora::before {
+  top: -16%;
+  left: -8%;
+  background: radial-gradient(circle at 30% 30%, var(--grad-from), transparent 68%);
+  animation: aurora-drift-a 26s ease-in-out infinite alternate;
+}
+
+.app-aurora::after {
+  bottom: -22%;
+  right: -10%;
+  background: radial-gradient(circle at 70% 70%, var(--grad-to), transparent 68%);
+  animation: aurora-drift-b 32s ease-in-out infinite alternate;
+}
+
+.dark .app-aurora::before,
+.dark .app-aurora::after {
+  opacity: 0.28;
+  filter: blur(88px);
+}
+
+@keyframes aurora-drift-a {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(8vw, 6vh, 0) scale(1.12); }
+}
+
+@keyframes aurora-drift-b {
+  0% { transform: translate3d(0, 0, 0) scale(1.05); }
+  100% { transform: translate3d(-7vw, -5vh, 0) scale(0.95); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-aurora::before,
+  .app-aurora::after {
+    animation: none !important;
   }
 }
 

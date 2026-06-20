@@ -17,6 +17,8 @@ public class AiSettings {
     private String encryptedKey;
     private Boolean isCustom;
     private String maskedKey;
+    /** 用户指定的调用模型名（可空，空则使用服务端默认模型）。 */
+    private String model;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

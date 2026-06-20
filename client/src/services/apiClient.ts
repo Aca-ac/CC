@@ -103,6 +103,8 @@ export interface CommitTaskNode {
   estimatedMinutes: number;
   priority: string;
   subtasks?: CommitTaskNode[];
+  /** ISO LocalDateTime（如 2026-07-01T23:59:00），可空 */
+  dueTime?: string | null;
 }
 
 export interface BreakdownCommitPayload {
@@ -124,6 +126,7 @@ export interface AiSettingsItem {
   provider: string;
   isCustom: boolean;
   maskedKey: string;
+  model: string | null;
   updatedAt: string;
 }
 
@@ -131,6 +134,7 @@ export interface UpdateAiSettingsPayload {
   provider: string;
   apiKey: string;
   isCustom: boolean;
+  model?: string;
 }
 
 const API_URL_KEY = "chronos:apiUrl";
