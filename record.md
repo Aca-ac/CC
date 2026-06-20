@@ -142,3 +142,12 @@
 - 改动目的：按用户要求把「注销」实现为永久删除账号及全部数据（区别于「退出登录」）；并将本轮全部改动作为 2.0.0 发布。
 - 验证结果：前端 `npm run build --workspace client` 通过；后端 `AuthServiceTests` 通过（1/0/0）。
 - 发布：提交 PR 至 main（用户负责合并 → 触发 CD 部署网页版），推送 `v2.0.0` tag 触发 `windows-installer.yml` 出包并 `gh release create`（含修好命名后的 NSIS 安装包 + latest.yml）。
+
+## 2026-06-20 收尾阶段 6（桌面自托管自动更新 + 友好报错）
+
+- 背景：仓库为私有，GitHub Release 及资产需鉴权，electron-updater 匿名读取 `releases.atom` 得 404，桌面端「检查更新」报原始 HttpError。GitHub 不支持单独公开 Release（可见性跟随仓库）。
+- 改动文件：`client/electron/main.ts`（新增 `friendlyUpdateError`，`checkNativeUpdate`/`downloadNativeUpdate` 包裹 try/catch 并以友好状态返回，`error` 事件用友好文案，避免把网络错误堆栈抛到界面）、`client/package.json`（`build.publish` 由 github 改为 generic 自托管源 `https://vincentt.xyz/chronos/updates/`；版本 2.0.0 → 2.0.1）、`.github/workflows/windows-installer.yml`（构建后新增「Publish update feed to server」步骤：复用现有 DEPLOY_* SSH 密钥，scp `latest.yml + Chronos-Setup-*.exe + .blockmap` 到服务器 `/var/www/chronos-updates`）、`deploy/nginx-chronos.conf`（新增 `location /chronos/updates/` → alias `/var/www/chronos-updates/`，no-cache）。
+- 改动目的：在保持源码私有的前提下让桌面端自动更新可用——更新源自托管到用户服务器，应用改用 generic provider 拉取。
+- 验证结果：`npm run build --workspace client` 通过；workflow YAML 通过 `yaml.safe_load` 校验。
+- 服务器准备（需用户一次性执行）：`sudo mkdir -p /var/www/chronos-updates && sudo chown -R <DEPLOY_USER>:<DEPLOY_USER> /var/www/chronos-updates`；nginx 加 `/chronos/updates/` location 后 `nginx -t && systemctl reload nginx`。
+- 限制（引导问题）：当前已安装的 v2.0.0/v1.0.1 仍指向旧 GitHub 源，无法自动升到 2.0.1，需手动安装一次 2.0.1；此后 2.0.2+ 才会从自托管源自动更新。

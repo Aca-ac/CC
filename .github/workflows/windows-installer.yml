@@ -66,3 +66,38 @@ jobs:
             --notes $notes `
             --latest `
             $assets.FullName
+
+      - name: Publish update feed to server
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_PORT"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+
+          key="chronos_deploy_key"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
+          chmod 600 "$key"
+
+          # 自托管更新源目录（nginx 下以 /chronos/updates/ 提供；放在仓库外，CD 重建 dist 不会清空）
+          target="/var/www/chronos-updates"
+
+          ssh -i "$key" -p "$DEPLOY_PORT" \
+            -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$target'"
+
+          # 上传 electron-updater 自托管源所需文件：安装包 + blockmap + latest.yml
+          scp -i "$key" -P "$DEPLOY_PORT" \
+            -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
+            client/release/latest.yml \
+            client/release/Chronos-Setup-*.exe \
+            client/release/Chronos-Setup-*.exe.blockmap \
+            "$DEPLOY_USER@$DEPLOY_HOST:$target/"
+
+          rm -f "$key"
