@@ -10,6 +10,14 @@ CREATE TABLE IF NOT EXISTS users (
     deleted_at TIMESTAMP NULL
 );
 
+CREATE TABLE IF NOT EXISTS sa_token_store (
+    store_key VARCHAR(255) PRIMARY KEY,
+    value_type VARCHAR(16) NOT NULL,
+    value_data CLOB NOT NULL,
+    expires_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL
+);
+
 CREATE TABLE IF NOT EXISTS projects (
     id VARCHAR(64) PRIMARY KEY,
     user_id VARCHAR(64) NOT NULL,

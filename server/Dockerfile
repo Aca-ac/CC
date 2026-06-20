@@ -6,10 +6,9 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 COPY server/.mvn .mvn
 COPY server/mvnw server/pom.xml ./
-RUN chmod +x mvnw && ./mvnw -q -DskipTests dependency:go-offline
 
 COPY server/src src
-RUN ./mvnw -q -DskipTests package && cp target/*.jar /workspace/app.jar
+RUN chmod +x mvnw && ./mvnw -DskipTests package && cp target/*.jar /workspace/app.jar
 
 FROM eclipse-temurin:17-jre
 

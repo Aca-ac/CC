@@ -14,7 +14,8 @@ export function PageHeader({ eyebrow, title, description, actions, className }: 
     <header className={cn("flex flex-wrap items-end justify-between gap-4", className)}>
       <div className="min-w-0">
         {eyebrow && (
-          <p className="mb-1 text-[0.74rem] font-semibold uppercase tracking-[0.12em] text-brand">
+          <p className="mb-2 flex items-center gap-2 text-[0.76rem] font-semibold tracking-[0.02em] text-brand">
+            <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-brand" aria-hidden />
             {eyebrow}
           </p>
         )}

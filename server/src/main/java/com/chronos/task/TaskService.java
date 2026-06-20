@@ -116,6 +116,8 @@ public class TaskService extends ServiceImpl<TaskMapper, Task> {
         task.setDescription(request.description());
         task.setPriority(request.priority());
         task.setEstimatedMinutes(request.estimatedMinutes());
+        task.setActualMinutes(0);
+        task.setTags(new String[0]);
 
         if (request.dueTime() != null) {
             task.setDueTime(request.dueTime().toLocalDateTime());

@@ -39,7 +39,7 @@ export function StatCard({
     <article
       className={cn(
         "group flex items-center gap-3 rounded-lg border border-line bg-panel px-3.5 py-3 shadow-soft",
-        "transition-[box-shadow,border-color] duration-200 ease-out hover:border-brand/40 hover:shadow-float",
+        "transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-float",
         className
       )}
     >

@@ -18,13 +18,15 @@ public record WeeklyStatsResponse(
             String date,
             int tasksCompleted,
             int focusMinutes,
-            int checkins
+            int checkins,
+            int minutes
     ) {}
 
     public record ProjectStats(
             String projectId,
             String projectName,
             int totalTasks,
-            int completedTasks
+            int completedTasks,
+            int minutes
     ) {}
 }

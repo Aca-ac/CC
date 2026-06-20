@@ -60,6 +60,6 @@ describe("AppLayout", () => {
     );
 
     expect(screen.getByTestId("desktop-sidebar-rail").getAttribute("data-expanded")).toBe("false");
-    expect(screen.getByTitle("今日看板").getAttribute("aria-label")).toBe("今日看板");
+    expect(screen.getByLabelText("今日看板").getAttribute("aria-label")).toBe("今日看板");
   });
 });

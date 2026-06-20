@@ -1,5 +1,5 @@
 import { createContext, useCallback, useEffect, useState } from "react";
-import { getApiBaseUrl } from "../services/apiClient";
+import { getApiBaseUrl, SESSION_INVALIDATED_EVENT } from "../services/apiClient";
 
 export interface AuthSession {
   userId: string;
@@ -39,6 +39,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch { /* ignore */ }
     setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    const clearInvalidSession = () => {
+      setSession(null);
+      setOffline(false);
+    };
+    window.addEventListener(SESSION_INVALIDATED_EVENT, clearInvalidSession);
+    return () => window.removeEventListener(SESSION_INVALIDATED_EVENT, clearInvalidSession);
   }, []);
 
   const login = useCallback((s: AuthSession) => {

@@ -18,9 +18,9 @@ const statusToneMap: Record<TaskStatus, Tone> = {
 };
 
 const priorityText: Record<TaskPriority, string> = {
-  LOW: "低",
-  MEDIUM: "中",
-  HIGH: "高",
+  LOW: "低优先级",
+  MEDIUM: "中优先级",
+  HIGH: "高优先级",
   URGENT: "紧急",
 };
 
@@ -40,5 +40,5 @@ export function StatusBadge({ status }: { status: TaskStatus }) {
 }
 
 export function PriorityBadge({ priority }: { priority: TaskPriority }) {
-  return <Badge tone={priorityToneMap[priority]}>{priorityText[priority]} · 优先级</Badge>;
+  return <Badge tone={priorityToneMap[priority]}>{priorityText[priority]}</Badge>;
 }

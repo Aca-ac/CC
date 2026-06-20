@@ -85,7 +85,7 @@ public class TimerService {
 
         // 4. 创建新的计时器
         FocusSession session = new FocusSession();
-        session.setId(UUID.randomUUID().toString());
+        session.setId(StringUtils.hasText(request.sessionId()) ? request.sessionId() : UUID.randomUUID().toString());
         session.setUserId(userId);
         session.setProjectId(request.projectId());
         session.setTaskId(request.taskId());

@@ -4,7 +4,7 @@ export interface Mutation {
   mutationId: string;
   timestamp: number;
   operation: "CREATE" | "UPDATE" | "DELETE";
-  entityType: "PROJECT" | "TASK" | "LOG";
+  entityType: "PROJECT" | "TASK" | "LOG" | "FOCUS";
   entityId: string;
   payload: unknown;
 }

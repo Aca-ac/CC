@@ -12,6 +12,7 @@ import {
 import { useDashboard } from "../hooks/useDashboard";
 import { useAiAdvice } from "../hooks/useAiAdvice";
 import { PriorityBadge, StatusBadge } from "../components/StatusBadge";
+import { MarkdownView } from "../components/MarkdownView";
 import {
   AnimatedNumber,
   Badge,
@@ -86,7 +87,7 @@ export function DashboardPage() {
         />
         <div className="relative flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
           <div className="min-w-0">
-            <p className="text-[0.82rem] font-medium text-brand">{greeting(now.getHours())}，欢迎回来 👋</p>
+            <p className="text-[0.82rem] font-medium text-brand">{greeting(now.getHours())}，欢迎回来</p>
             <h2 className="mt-1 text-2xl font-bold tracking-tight text-ink">
               今天还有 {todayTotal - todayDone} 个任务待完成
             </h2>
@@ -223,7 +224,7 @@ export function DashboardPage() {
                   className="rounded-md border border-line bg-panel-muted/60 p-3"
                 >
                   <p className="text-[0.88rem] font-semibold text-ink">{item.title}</p>
-                  <p className="mt-1 text-[0.82rem] leading-relaxed text-muted">{item.content}</p>
+                  <MarkdownView source={item.content} className="markdown-compact mt-1" />
                 </motion.li>
               ))}
             </motion.ul>

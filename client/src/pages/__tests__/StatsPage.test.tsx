@@ -52,4 +52,20 @@ describe("StatsPage", () => {
     expect(screen.getByText("代数")).toBeDefined();
     expect(screen.getAllByText("180 分钟").length).toBeGreaterThan(0);
   });
+
+  it("不因缺字段的过期缓存而崩溃（回归：dailyMinutes 缺失）", () => {
+    // 旧版本写入的缓存：stats 存在但缺少数组字段，曾导致一打开统计页就白屏崩溃
+    statsMocks.useStats.mockReturnValue({
+      stats: { totalCompleted: 3, completionRate: 50 } as never,
+      loading: false,
+      error: null,
+      cached: true,
+      refresh: statsMocks.refresh,
+    });
+
+    // 修复前：stats?.dailyMinutes.reduce 在数组缺失时抛 TypeError，整页白屏
+    expect(() => render(<StatsPage />)).not.toThrow();
+    // 页面正常挂载（标题可见），而不是崩溃白屏
+    expect(screen.getByText("学习统计")).toBeTruthy();
+  });
 });

@@ -26,12 +26,17 @@ services:
         condition: service_healthy
     environment:
       SERVER_PORT: 8080
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
       CHRONOS_MYSQL_URL: jdbc:mysql://db:3306/${CHRONOS_MYSQL_DATABASE:-chronos}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
       CHRONOS_MYSQL_USERNAME: ${CHRONOS_MYSQL_USERNAME:-chronos}
       CHRONOS_MYSQL_PASSWORD: ${CHRONOS_MYSQL_PASSWORD:-chronos_password}
       CHRONOS_JWT_SECRET: ${CHRONOS_JWT_SECRET:-replace-with-a-long-random-secret}
+      CHRONOS_AI_MASTER_KEY: ${CHRONOS_AI_MASTER_KEY:-replace-with-a-32-byte-random-secret}
       CHRONOS_AI_PROVIDER: ${CHRONOS_AI_PROVIDER:-mock}
       CHRONOS_AI_API_KEY: ${CHRONOS_AI_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      TZ: Asia/Shanghai
+      JAVA_TOOL_OPTIONS: -Duser.timezone=Asia/Shanghai
     ports:
       - "${CHRONOS_API_PORT:-8080}:8080"
 

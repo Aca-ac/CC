@@ -1,7 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
-import { checkForUpdates, compareVersions } from "../updateService";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  checkDesktopUpdate,
+  checkForUpdates,
+  compareVersions,
+  type DesktopUpdateStatus,
+} from "../updateService";
 
 describe("updateService", () => {
+  afterEach(() => {
+    delete window.chronosDesktop;
+  });
+
   it("compares semantic versions with optional v prefix", () => {
     expect(compareVersions("v0.2.0", "0.1.9")).toBe(1);
     expect(compareVersions("1.0.0", "1.0.0")).toBe(0);
@@ -64,5 +73,22 @@ describe("updateService", () => {
 
     expect(result.status).toBe("unavailable");
     expect(result.releaseUrl).toContain("/releases");
+  });
+
+  it("asks the packaged desktop updater to check without opening GitHub", async () => {
+    const status: DesktopUpdateStatus = { state: "checking" };
+    const check = vi.fn().mockResolvedValue(status);
+    window.chronosDesktop = {
+      platform: "win32",
+      updates: {
+        check,
+        download: vi.fn(),
+        install: vi.fn(),
+        onStatus: vi.fn(() => () => undefined),
+      },
+    };
+
+    await expect(checkDesktopUpdate()).resolves.toEqual(status);
+    expect(check).toHaveBeenCalledTimes(1);
   });
 });

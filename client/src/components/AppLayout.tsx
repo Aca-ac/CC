@@ -74,10 +74,9 @@ function SidebarContent({
               to={item.path}
               onClick={onNavigate}
               aria-label={item.label}
-              title={item.label}
               className={({ isActive }) =>
                 cn(
-                  "relative flex h-10 items-center rounded-md transition-colors duration-150",
+                  "group relative flex h-10 items-center rounded-md transition-colors duration-150",
                   expanded ? "justify-start px-3" : "justify-center px-0",
                   !isActive && "hover:bg-panel-muted"
                 )
@@ -104,15 +103,27 @@ function SidebarContent({
                     )}
                   >
                     <Icon size={18} strokeWidth={2.1} />
-                    <motion.span
-                      initial={false}
-                      animate={{ ...labelMotion, width: expanded ? 142 : 0 }}
-                      transition={labelTransition}
-                      className="overflow-hidden whitespace-nowrap"
+                    {expanded && (
+                      <motion.span
+                        initial={false}
+                        animate={{ ...labelMotion, width: 142 }}
+                        transition={labelTransition}
+                        className="overflow-hidden whitespace-nowrap"
+                      >
+                        {item.label}
+                      </motion.span>
+                    )}
+                  </span>
+
+                  {/* 收起的窄栏：悬停图标时浮出文字提示，整体不再展开 */}
+                  {!expanded && (
+                    <span
+                      role="tooltip"
+                      className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-ink px-2.5 py-1 text-[0.78rem] font-medium text-surface opacity-0 shadow-float transition-opacity duration-150 group-hover:opacity-100"
                     >
                       {item.label}
-                    </motion.span>
-                  </span>
+                    </span>
+                  )}
                 </>
               )}
             </NavLink>
@@ -195,7 +206,6 @@ function SidebarContent({
 export function AppLayout({ navigation, children }: AppLayoutProps) {
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [desktopSidebarExpanded, setDesktopSidebarExpanded] = useState(false);
 
   // 路由切换时关闭移动端抽屉
   useEffect(() => {
@@ -215,31 +225,14 @@ export function AppLayout({ navigation, children }: AppLayoutProps) {
       />
 
       <div className="relative z-10 grid h-full lg:grid-cols-[72px_minmax(0,1fr)]">
-        {/* Desktop sidebar */}
-        <div className="relative hidden lg:block">
-          <motion.aside
-            data-testid="desktop-sidebar-rail"
-            data-expanded={desktopSidebarExpanded ? "true" : "false"}
-            aria-expanded={desktopSidebarExpanded}
-            className={cn(
-              "absolute left-0 top-0 z-30 h-full overflow-hidden border-r border-line bg-panel/90 backdrop-blur-sm",
-              desktopSidebarExpanded && "shadow-float"
-            )}
-            initial={false}
-            animate={{ width: desktopSidebarExpanded ? 248 : 72 }}
-            transition={{ type: "spring", stiffness: 420, damping: 38 }}
-            onMouseEnter={() => setDesktopSidebarExpanded(true)}
-            onMouseLeave={() => setDesktopSidebarExpanded(false)}
-            onFocus={() => setDesktopSidebarExpanded(true)}
-            onBlur={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                setDesktopSidebarExpanded(false);
-              }
-            }}
-          >
-            <SidebarContent navigation={navigation} expanded={desktopSidebarExpanded} />
-          </motion.aside>
-        </div>
+        {/* Desktop sidebar — 固定窄栏；悬停图标浮出文字提示，整体不再展开 */}
+        <aside
+          data-testid="desktop-sidebar-rail"
+          data-expanded="false"
+          className="relative z-30 hidden h-full w-[72px] border-r border-line bg-panel/90 backdrop-blur-sm lg:block"
+        >
+          <SidebarContent navigation={navigation} expanded={false} />
+        </aside>
 
         {/* Main */}
         <div className="flex min-w-0 flex-col overflow-hidden">

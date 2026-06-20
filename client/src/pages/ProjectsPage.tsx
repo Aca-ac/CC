@@ -112,7 +112,7 @@ export function ProjectsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Projects"
+        eyebrow="项目管理"
         title="学习项目"
         description="按项目拆分目标、进度和学习周期。"
         actions={
@@ -126,10 +126,12 @@ export function ProjectsPage() {
               <IconRefresh size={15} className={loading ? "animate-spin" : undefined} />
               刷新
             </Button>
-            <Button size="sm" onClick={openCreate}>
-              <IconPlus size={15} />
-              新建项目
-            </Button>
+            {projects.length > 0 && (
+              <Button size="sm" onClick={openCreate}>
+                <IconPlus size={15} />
+                新建项目
+              </Button>
+            )}
           </>
         }
       />

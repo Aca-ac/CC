@@ -26,8 +26,17 @@ export interface SyncRecordItem {
   payload: Record<string, unknown>;
 }
 
+export interface SyncResolvePayload {
+  id: string;
+  entityType: string;
+  entityId: string;
+  version: number;
+  resolvedPayload: string;
+  resolveType: "keep-local" | "keep-cloud";
+}
+
 export interface ActiveTimerResponse {
-  sessionId: string;
+  id: string;
   projectId: string;
   taskId?: string;
   startedAt: string;
@@ -36,6 +45,7 @@ export interface ActiveTimerResponse {
 export interface TimerStartRequest {
   projectId: string;
   taskId?: string;
+  sessionId?: string;
 }
 
 export interface TimerStopRequest {
@@ -125,6 +135,7 @@ export interface UpdateAiSettingsPayload {
 
 const API_URL_KEY = "chronos:apiUrl";
 const TOKEN_KEY = "chronos:session";
+export const SESSION_INVALIDATED_EVENT = "chronos:session-invalidated";
 
 export function getApiBaseUrl(): string {
   return localStorage.getItem(API_URL_KEY) ?? import.meta.env.VITE_API_BASE_URL ?? "/api";
@@ -139,6 +150,14 @@ function getToken(): string | null {
   } catch { return null; }
 }
 
+function invalidateSession() {
+  localStorage.removeItem(TOKEN_KEY);
+  window.dispatchEvent(new Event(SESSION_INVALIDATED_EVENT));
+  if (window.location.hash !== "#/login") {
+    window.location.hash = "#/login";
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -150,15 +169,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, { headers, ...init });
 
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      localStorage.removeItem(TOKEN_KEY);
-      window.location.hash = "#/login";
-    }
+    if (response.status === 401) invalidateSession();
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
   const body = (await response.json()) as ApiResponse<T>;
-  if (!body.success) throw new Error(`${body.code}: ${body.message}`);
+  if (!body.success) {
+    if (body.code === "UNAUTHORIZED") invalidateSession();
+    throw new Error(`${body.code}: ${body.message}`);
+  }
   return body.data;
 }
 
@@ -185,7 +204,7 @@ export const apiClient = {
   // ── Timer ────────────────────────────────────────────────────
   getActiveTimer: () => request<ActiveTimerResponse | null>("/timer/active"),
   startTimer: (payload: TimerStartRequest) =>
-    request<{ sessionId: string }>("/timer/start", { method: "POST", body: JSON.stringify(payload) }),
+    request<ActiveTimerResponse>("/timer/start", { method: "POST", body: JSON.stringify(payload) }),
   stopTimer: (sessionId: string, payload: TimerStopRequest) =>
     request<void>(`/timer/${sessionId}/stop`, { method: "POST", body: JSON.stringify(payload) }),
   discardTimer: (sessionId: string) =>
@@ -222,8 +241,8 @@ export const apiClient = {
   syncPull: (cursor?: string) =>
     request<{ changes: SyncRecordItem[]; cursor: string }>(`/sync/pull${cursor ? `?cursor=${cursor}` : ""}`),
 
-  resolveConflict: (conflictId: string, payload: { resolution: "keep-local" | "keep-cloud" }) =>
-    request<void>("/sync/resolve", { method: "POST", body: JSON.stringify({ id: conflictId, ...payload }) }),
+  resolveConflict: (payload: SyncResolvePayload) =>
+    request<void>("/sync/resolve", { method: "POST", body: JSON.stringify(payload) }),
 
   // ── Habits (FR-习惯打卡 / UC-Habit) ──────────────────────────
   listHabits: () => request<HabitDTO[]>("/habits"),

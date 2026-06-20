@@ -259,6 +259,8 @@ public class AiService extends ServiceImpl<AiAdviceMapper, AiAdvice> {
         task.setEstimatedMinutes(node.estimatedMinutes() > 0 ? node.estimatedMinutes() : 30);
         task.setPriority(node.priority() != null ? node.priority() : Priority.MEDIUM);
         task.setStatus(TaskStatus.TODO);
+        task.setActualMinutes(0);
+        task.setTags(new String[0]);
         task.setCreatedAt(LocalDateTime.now());
         task.setUpdatedAt(LocalDateTime.now());
         taskMapper.insert(task);

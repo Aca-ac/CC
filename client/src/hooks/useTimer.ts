@@ -114,7 +114,7 @@ export function useTimer(): UseTimerReturn {
 
       // 尝试通知服务端（失败不阻塞本地）
       try {
-        await apiClient.startTimer({ projectId, taskId });
+        await apiClient.startTimer({ projectId, taskId, sessionId });
       } catch {
         // 离线时进入 outbox，后续同步
       }
@@ -194,10 +194,10 @@ export function useTimer(): UseTimerReturn {
         const elapsed = Math.floor((Date.now() - serverStart) / 1000);
 
         // 同步到本地
-        const existing = await focusSessionRepository.findById(serverActive.sessionId);
+        const existing = await focusSessionRepository.findById(serverActive.id);
         if (!existing) {
           await focusSessionRepository.create({
-            id: serverActive.sessionId,
+            id: serverActive.id,
             accountId,
             projectId: serverActive.projectId,
             taskId: serverActive.taskId,
@@ -211,7 +211,7 @@ export function useTimer(): UseTimerReturn {
         await timerStateRepository.set({
           accountId,
           active: true,
-          sessionId: serverActive.sessionId,
+          sessionId: serverActive.id,
           projectId: serverActive.projectId,
           taskId: serverActive.taskId,
           startTime: serverStart,
@@ -224,7 +224,7 @@ export function useTimer(): UseTimerReturn {
           elapsedSeconds: elapsed,
           projectId: serverActive.projectId,
           taskId: serverActive.taskId,
-          sessionId: serverActive.sessionId,
+          sessionId: serverActive.id,
           restoring: false,
           error: null,
         });

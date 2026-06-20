@@ -1,5 +1,9 @@
 server:
   port: ${SERVER_PORT:8080}
+  # 部署在 nginx 反代后：TLS 在 nginx 终止，后端收到的是明文 HTTP。
+  # 让 Spring 识别 nginx 传来的 X-Forwarded-Proto，使 request.isSecure() 在
+  # HTTPS 访问时返回 true（否则 BYOK 写入的 HTTPS 校验会误判失败）。
+  forward-headers-strategy: framework
 
 spring:
   application:
@@ -12,6 +16,15 @@ spring:
     url: ${CHRONOS_MYSQL_URL:jdbc:mysql://localhost:3306/chronos?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
     username: ${CHRONOS_MYSQL_USERNAME:chronos}
     password: ${CHRONOS_MYSQL_PASSWORD:chronos_password}
+sa-token:
+  token-name: satoken
+  timeout: 2592000
+  active-timeout: -1
+  is-concurrent: true
+  is-share: true
+  token-style: uuid
+  is-read-header: true
+  is-read-cookie: false
 mybatis-plus:
   # 实体类所在的包路径，换成你项目中 entity 文件夹的实际包名（MP会自动建立类型别名）
   type-aliases-package: com.chronos.entity

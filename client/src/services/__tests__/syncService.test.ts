@@ -3,7 +3,7 @@ import { closeDB, deleteDB } from "../../storage/db";
 import { outboxRepository } from "../../storage/repositories/outboxRepository";
 import { conflictRepository } from "../../storage/repositories/conflictRepository";
 import { createMutation } from "../../storage/mutation";
-import { pushPendingMutations } from "../syncService";
+import { pushPendingMutations, resolveConflict } from "../syncService";
 
 // 对 apiClient 进行 mock，使用真实的 fake-indexeddb 支持的仓库
 vi.mock("../apiClient", () => ({
@@ -117,5 +117,57 @@ describe("syncService — pushPendingMutations", () => {
     expect(unresolved).toHaveLength(1);
     expect(unresolved[0].entityId).toBe(mutation.entityId);
     expect(unresolved[0].resolved).toBe(false);
+  });
+
+  it("push includes focus records instead of silently marking them synced", async () => {
+    const mutation = createMutation("CREATE", "FOCUS", "focus-push-1", {
+      projectId: "project-1",
+      startTime: Date.now(),
+      updatedAt: Date.now(),
+    });
+    await outboxRepository.create({
+      mutationId: mutation.mutationId,
+      accountId,
+      operation: mutation.operation,
+      entityType: mutation.entityType,
+      entityId: mutation.entityId,
+      payload: JSON.stringify(mutation.payload),
+      status: "pending",
+      retryCount: 0,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    vi.mocked(apiClient.syncPush).mockResolvedValue({ accepted: 1, conflicts: [] });
+
+    await pushPendingMutations(accountId);
+
+    expect(apiClient.syncPush).toHaveBeenCalledWith([
+      expect.objectContaining({ entityType: "FOCUS", entityId: "focus-push-1" }),
+    ]);
+  });
+
+  it("resolves a local conflict by sending the selected local payload to the server", async () => {
+    const localData = JSON.stringify({ projectId: "project-1", title: "Keep this title" });
+    await conflictRepository.create({
+      id: "conflict-local-1",
+      accountId,
+      entityType: "TASK",
+      entityId: "task-local-1",
+      localData,
+      remoteData: JSON.stringify({ projectId: "project-1", title: "Cloud title" }),
+      resolved: false,
+      createdAt: Date.now(),
+    });
+    vi.mocked(apiClient.resolveConflict).mockResolvedValue(undefined);
+
+    await expect(resolveConflict("conflict-local-1", accountId, "local")).resolves.toEqual({ success: true });
+    expect(apiClient.resolveConflict).toHaveBeenCalledWith({
+      id: "conflict-local-1",
+      entityType: "TASK",
+      entityId: "task-local-1",
+      version: expect.any(Number),
+      resolvedPayload: localData,
+      resolveType: "keep-local",
+    });
   });
 });

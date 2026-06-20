@@ -181,7 +181,7 @@ export function LearningLogsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Logs"
+        eyebrow="记录与计时"
         title="学习记录"
         description="把手动复盘和专注计时放在同一条时间线里，方便回看投入与难度。"
         actions={

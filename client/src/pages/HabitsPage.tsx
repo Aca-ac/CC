@@ -54,6 +54,19 @@ const TONE_SOFT: Record<Tone, string> = {
   neutral: "bg-panel-muted text-muted",
 };
 
+const RECENT_DAYS = 21;
+
+// 后端暂不返回逐日打卡历史，这里依据 streakCount 还原最近的连续打卡格子：
+// 最近的 streak 天视为已打卡，锚点为今天（今日已打卡）或昨天（今日未打卡）。
+function buildStreakCells(streak: number, doneToday: boolean): boolean[] {
+  const cells = new Array<boolean>(RECENT_DAYS).fill(false);
+  const end = doneToday ? RECENT_DAYS - 1 : RECENT_DAYS - 2;
+  for (let i = 0; i < streak && end - i >= 0; i += 1) {
+    cells[end - i] = true;
+  }
+  return cells;
+}
+
 export function HabitsPage() {
   const {
     habits,
@@ -119,7 +132,7 @@ export function HabitsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Habits"
+        eyebrow="每日坚持"
         title="习惯打卡"
         description="把重复行为变成连续记录，用连签天数和成就维持动力。"
         actions={
@@ -128,10 +141,12 @@ export function HabitsPage() {
               <IconRefresh size={15} className={loading ? "animate-spin" : undefined} />
               刷新
             </Button>
-            <Button size="sm" onClick={openCreate}>
-              <IconPlus size={15} />
-              新建习惯
-            </Button>
+            {habits.length > 0 && (
+              <Button size="sm" onClick={openCreate}>
+                <IconPlus size={15} />
+                新建习惯
+              </Button>
+            )}
           </>
         }
       />
@@ -268,6 +283,32 @@ export function HabitsPage() {
                       </Badge>
                     </motion.span>
                   </div>
+
+                  {/* 打卡热力格：依据连续天数还原最近 21 天 */}
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between text-[0.72rem] text-muted">
+                      <span>近 {RECENT_DAYS} 天</span>
+                      <span>{done ? "今日已打卡" : "今日待打卡"}</span>
+                    </div>
+                    <div
+                      className="flex flex-wrap gap-1"
+                      role="img"
+                      aria-label={`最近 ${RECENT_DAYS} 天打卡情况，连续 ${habit.streakCount} 天`}
+                    >
+                      {buildStreakCells(habit.streakCount, done).map((filled, index) => (
+                        <span
+                          key={index}
+                          title={index === RECENT_DAYS - 1 ? "今天" : undefined}
+                          className={
+                            "h-3.5 w-3.5 rounded-[3px] transition-colors " +
+                            (filled ? "bg-habit" : "bg-panel-muted") +
+                            (index === RECENT_DAYS - 1 ? " ring-1 ring-habit/50" : "")
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="mt-auto">
                     <Button
                       variant={done ? "soft" : "primary"}

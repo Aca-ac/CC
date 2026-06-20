@@ -141,7 +141,7 @@ export function AiBreakdownPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="AI Breakdown"
+        eyebrow="智能规划"
         title="AI 拆解工作台"
         description="把一个学习目标转换为可检查、可编辑的阶段任务草稿，确认后落库到项目。"
         actions={
