@@ -112,3 +112,10 @@
 - 改动目的：按用户要求收尾——固定窄侧栏 + 悬停文字提示、统计页可视化扩展（习惯热力格 + 时间构成 + 项目进度）、面向用户的中文文案规整；并修复统计页一打开即崩溃的线上问题。
 - 验证结果：`npx tsc -p tsconfig.app.json --noEmit` 与 `electron/tsconfig.json` 均通过；`cd client && npx vitest run` 全绿（25 文件 / 68 测试，新增统计页崩溃回归 1 项）。
 - 已知限制：习惯热力格仅由 streakCount 还原（后端暂无逐日打卡历史端点），展示的是「最近连续打卡」而非真实逐日记录，如需真实多周历史需新增后端 `GET /habits/{id}/checkins` 并重新部署；统计页崩溃同样存在于已部署网页版（main 分支同源），需重新部署前端方可在线上修复。
+
+## 2026-06-20 收尾阶段 4b（质感/动效打磨 + 发布修复）
+
+- 改动文件：`client/src/styles/global.css`（阴影 token 改为经 `--elevation-1/2` 间接引用、随主题切换，深色加顶边高光，使卡片有「浮起」质感；新增 `.markdown-compact` 紧凑 Markdown 变体）、`client/src/components/ui/PageHeader.tsx`（eyebrow 改为「靛蓝竖条 + 文案」，去掉对中文不友好的 `uppercase`/宽字距）、`client/src/components/ui/StatCard.tsx`（悬停轻微上移微交互）、`client/src/pages/DashboardPage.tsx`（AI 每周建议改用 `MarkdownView` 渲染、去掉问候语 emoji）、`client/package.json`（`dist:win` 增加 `--publish never`，修复 v1.0.1 发布构建因 electron-builder 检测 tag 触发隐式 GitHub 发布、缺 `GH_TOKEN` 而失败的问题；发布仍由工作流的 `gh release create` 完成）。
+- 改动目的：按用户反馈把产品进一步打磨——布局质感（阴影/层次）、动效微交互、Markdown 渲染、减少 emoji；并修复 v1.0.1 桌面发布失败。
+- 验证结果：`npm run build`（client）通过；`npx vitest run` 全绿（25 文件 / 68 测试）；Playwright 实机截图核对深/浅主题卡片质感与 eyebrow 竖条。
+- 待办：用户反馈的「部分页面文字重复」（候选：空列表页 header 与空状态各有一个「新建X」按钮）待确认具体页面后再改；网页版同源的统计页崩溃仍需重新部署前端才能在线修复。
