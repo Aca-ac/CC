@@ -236,7 +236,7 @@ export function LearningLogsPage() {
       <Card>
         <CardHeader
           title="专注计时器"
-          subtitle="计时结束后会自动进入学习记录，并通过 outbox 同步。"
+          subtitle="计时结束后会自动生成一条学习记录。"
           action={timer.active ? <Badge tone="success">运行中</Badge> : <Badge tone="neutral">未启动</Badge>}
         />
 

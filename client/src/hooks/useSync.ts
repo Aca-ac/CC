@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { outboxRepository } from "../storage/repositories/outboxRepository";
+import { OUTBOX_CHANGED_EVENT, outboxRepository } from "../storage/repositories/outboxRepository";
 import { fullSync } from "../services/syncService";
+
+/** 周期性静默同步的心跳间隔（毫秒）。 */
+const SYNC_HEARTBEAT_MS = 20_000;
+/** 本地写入后到触发推送的去抖延迟（毫秒）。 */
+const SYNC_DEBOUNCE_MS = 1_200;
 
 export interface UseSyncReturn {
   /** 当前同步状态 */
@@ -22,8 +27,11 @@ export interface UseSyncReturn {
  *
  * 提供同步触发、状态跟踪和待同步条目计数。
  * accountId 需要由调用方传入（从 auth context 获取），为 null 时不执行任何操作。
+ *
+ * `auto` 为 true（已登录且在线）时进行静默自动同步：挂载即同步、本地写入后即时推送、
+ * 网络恢复时补同步，并以心跳间隔周期回拉远端变更，无需用户手动点击。
  */
-export function useSync(accountId: string | null): UseSyncReturn {
+export function useSync(accountId: string | null, auto = false): UseSyncReturn {
   const [status, setStatus] = useState<UseSyncReturn["status"]>("idle");
   const [pending, setPending] = useState(0);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
@@ -70,11 +78,48 @@ export function useSync(accountId: string | null): UseSyncReturn {
     }
   }, [accountId, refreshPending]);
 
-  // 挂载或 accountId 变化时刷新待同步计数（不自动触发网络同步）
+  // 挂载或 accountId 变化时刷新待同步计数
   useEffect(() => {
     if (!accountId) return;
     refreshPending();
   }, [accountId, refreshPending]);
+
+  // 静默自动同步：仅在已登录且在线时启用。
+  useEffect(() => {
+    if (!accountId || !auto) return;
+
+    let cancelled = false;
+    let debounceTimer: number | undefined;
+
+    const isOnline = () => typeof navigator === "undefined" || navigator.onLine;
+    const maybeSync = () => {
+      if (cancelled || !isOnline()) return;
+      void syncNow();
+    };
+    const scheduleSync = () => {
+      if (cancelled) return;
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(maybeSync, SYNC_DEBOUNCE_MS);
+    };
+
+    // 挂载即同步一次
+    maybeSync();
+
+    // 本地写入后即时推送（去抖）
+    window.addEventListener(OUTBOX_CHANGED_EVENT, scheduleSync);
+    // 网络恢复后补同步
+    window.addEventListener("online", maybeSync);
+    // 周期心跳：回拉远端变更
+    const heartbeat = window.setInterval(maybeSync, SYNC_HEARTBEAT_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(debounceTimer);
+      window.clearInterval(heartbeat);
+      window.removeEventListener(OUTBOX_CHANGED_EVENT, scheduleSync);
+      window.removeEventListener("online", maybeSync);
+    };
+  }, [accountId, auto, syncNow]);
 
   return {
     status,

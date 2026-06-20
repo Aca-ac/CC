@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   IconCheck,
   IconFlame,
@@ -84,6 +84,7 @@ export function HabitsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<(typeof habits)[number] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [celebration, setCelebration] = useState<{ name: string; streak: number } | null>(null);
 
   const maxStreak = useMemo(
     () => habits.reduce((max, habit) => Math.max(max, habit.streakCount), 0),
@@ -117,7 +118,10 @@ export function HabitsPage() {
   const handleCheckin = async (id: string) => {
     setBusyId(id);
     try {
-      await checkin(id);
+      const name = habits.find((habit) => habit.id === id)?.name ?? "习惯";
+      const streak = await checkin(id);
+      setCelebration({ name, streak });
+      window.setTimeout(() => setCelebration(null), 1800);
     } finally {
       setBusyId(null);
     }
@@ -382,6 +386,55 @@ export function HabitsPage() {
       >
         <StateMessage kind="error">删除后连续天数和成就进度将无法恢复。</StateMessage>
       </Modal>
+
+      {/* 打卡庆祝弹窗 */}
+      <AnimatePresence>
+        {celebration && (
+          <motion.div
+            className="fixed inset-0 z-[120] grid place-items-center bg-black/30 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={() => setCelebration(null)}
+          >
+            <motion.div
+              className="relative flex w-[260px] flex-col items-center gap-3 rounded-2xl border border-line bg-panel px-6 py-7 text-center shadow-float"
+              initial={{ scale: 0.8, y: 16, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 360, damping: 22 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <span className="relative grid h-16 w-16 place-items-center">
+                {/* 扩散光环 */}
+                <motion.span
+                  className="absolute inset-0 rounded-full bg-success-soft"
+                  initial={{ scale: 0.6, opacity: 0.8 }}
+                  animate={{ scale: 1.8, opacity: 0 }}
+                  transition={{ duration: 0.9, ease: "easeOut" }}
+                />
+                <motion.span
+                  className="relative grid h-16 w-16 place-items-center rounded-full bg-success text-white"
+                  initial={{ scale: 0.4, rotate: -20 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: "spring", stiffness: 480, damping: 16, delay: 0.05 }}
+                >
+                  <IconCheck size={30} strokeWidth={3} />
+                </motion.span>
+              </span>
+              <div>
+                <p className="text-base font-bold text-ink">打卡成功</p>
+                <p className="mt-0.5 truncate text-[0.82rem] text-muted">{celebration.name}</p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1 text-[0.82rem] font-semibold text-warning">
+                <IconFlame size={14} />
+                连续 {celebration.streak} 天
+              </span>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,10 +1,10 @@
-import { useAccountId } from "../hooks/useAccountId";
+import { useAuth } from "../hooks/useAuth";
 import { useSync } from "../hooks/useSync";
 import { cn } from "../lib/cn";
 import { IconCheck, IconLoader, IconRefresh, IconUpload } from "./icons";
 
 /**
- * 侧栏底部的同步状态芯片：展示待同步数量与同步状态，点击触发一次完整同步。
+ * 侧栏底部的同步状态芯片：在线登录时自动静默同步，仅作状态展示；点击可手动立即同步。
  */
 export function SyncStatusChip({
   className,
@@ -13,8 +13,11 @@ export function SyncStatusChip({
   className?: string;
   expanded?: boolean;
 }) {
-  const accountId = useAccountId();
-  const { status, pending, syncNow } = useSync(accountId);
+  const { session, offline } = useAuth();
+  const accountId = session?.userId ?? "local";
+  // 已登录且非离线模式时启用自动同步
+  const autoSync = Boolean(session) && !offline;
+  const { status, pending, syncNow } = useSync(accountId, autoSync);
 
   const syncing = status === "syncing";
   const hasPending = pending > 0;
@@ -25,7 +28,9 @@ export function SyncStatusChip({
       ? "同步失败"
       : hasPending
         ? `${pending} 项待同步`
-        : "已同步";
+        : autoSync
+          ? "已自动同步"
+          : "已同步";
 
   const tone =
     status === "error"

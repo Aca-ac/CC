@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { IconAi, IconCheckCircle, IconRefresh, IconSparkles, IconTasks } from "../components/icons";
@@ -30,16 +30,51 @@ interface DraftTask {
   description: string;
   estimatedMinutes: number;
   priority: TaskPriority;
+  /** 截止日期 YYYY-MM-DD（可编辑，默认按阶段在计划周期内均匀铺排） */
+  dueDate: string;
 }
 
 const PRIORITIES: TaskPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+const DRAFT_STORAGE_KEY = "chronos:aiBreakdownDraft";
+
+interface PersistedBreakdown {
+  goal: string;
+  weeks: number;
+  projectId: string;
+  tree: BreakdownTree | null;
+  drafts: DraftTask[];
+}
+
+function loadPersisted(): PersistedBreakdown | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as PersistedBreakdown) : null;
+  } catch {
+    return null;
+  }
+}
 
 function normalizePriority(value: string): TaskPriority {
   const upper = (value ?? "").toUpperCase() as TaskPriority;
   return PRIORITIES.includes(upper) ? upper : "MEDIUM";
 }
 
+function addDaysISO(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
+/** 把阶段在计划周期内均匀铺排，得到该阶段的默认截止日期。 */
+function stageDueDate(stageIndex: number, stageCount: number, weeks: number): string {
+  const totalDays = Math.max(1, weeks) * 7;
+  const count = Math.max(1, stageCount);
+  return addDaysISO(Math.round(((stageIndex + 1) / count) * totalDays));
+}
+
 function toDrafts(tree: BreakdownTree): DraftTask[] {
+  const stageCount = tree.stages.length;
   return tree.stages.flatMap((stage, stageIndex) =>
     stage.tasks.map((task, taskIndex) => ({
       id: `${stageIndex}-${taskIndex}`,
@@ -49,6 +84,7 @@ function toDrafts(tree: BreakdownTree): DraftTask[] {
       description: task.description,
       estimatedMinutes: Math.max(1, task.estimatedMinutes || 30),
       priority: normalizePriority(task.priority),
+      dueDate: stageDueDate(stageIndex, stageCount, tree.weeks),
     })),
   );
 }
@@ -61,21 +97,36 @@ function toCommitNode(draft: DraftTask): CommitTaskNode {
     estimatedMinutes: Math.max(1, draft.estimatedMinutes),
     priority: draft.priority,
     subtasks: [],
+    dueTime: draft.dueDate ? `${draft.dueDate}T23:59:00` : null,
   };
 }
 
 export function AiBreakdownPage() {
   const { projects } = useProjects();
-  const [goal, setGoal] = useState("");
-  const [weeks, setWeeks] = useState(4);
-  const [projectId, setProjectId] = useState("");
-  const [tree, setTree] = useState<BreakdownTree | null>(null);
-  const [drafts, setDrafts] = useState<DraftTask[]>([]);
+  const restored = useRef<PersistedBreakdown | null>(loadPersisted()).current;
+  const [goal, setGoal] = useState(restored?.goal ?? "");
+  const [weeks, setWeeks] = useState(restored?.weeks ?? 4);
+  const [projectId, setProjectId] = useState(restored?.projectId ?? "");
+  const [tree, setTree] = useState<BreakdownTree | null>(restored?.tree ?? null);
+  const [drafts, setDrafts] = useState<DraftTask[]>(restored?.drafts ?? []);
   const [loading, setLoading] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const navigate = useNavigate();
+
+  // 草稿进度持久化到会话存储，切换页面再回来不丢失。
+  useEffect(() => {
+    if (confirmed) return;
+    if (goal.trim() || tree || drafts.length > 0) {
+      sessionStorage.setItem(
+        DRAFT_STORAGE_KEY,
+        JSON.stringify({ goal, weeks, projectId, tree, drafts } satisfies PersistedBreakdown),
+      );
+    } else {
+      sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+    }
+  }, [goal, weeks, projectId, tree, drafts, confirmed]);
 
   const grouped = useMemo(() => {
     const map = new Map<number, DraftTask[]>();
@@ -111,7 +162,7 @@ export function AiBreakdownPage() {
   const handleConfirm = async () => {
     if (!tree || drafts.length === 0) return;
     if (!projectId) {
-      setError("请先选择要落库的目标项目。");
+      setError("请先选择目标项目。");
       return;
     }
     setCommitting(true);
@@ -119,6 +170,7 @@ export function AiBreakdownPage() {
     try {
       await aiService.commitBreakdown(tree.draftId, projectId, drafts.map(toCommitNode));
       setConfirmed(true);
+      sessionStorage.removeItem(DRAFT_STORAGE_KEY);
       window.setTimeout(() => navigate("/tasks"), 900);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -132,6 +184,7 @@ export function AiBreakdownPage() {
     setDrafts([]);
     setError(null);
     setConfirmed(false);
+    sessionStorage.removeItem(DRAFT_STORAGE_KEY);
   };
 
   const handleEdit = <K extends keyof DraftTask>(id: string, field: K, value: DraftTask[K]) => {
@@ -143,7 +196,7 @@ export function AiBreakdownPage() {
       <PageHeader
         eyebrow="智能规划"
         title="AI 拆解工作台"
-        description="把一个学习目标转换为可检查、可编辑的阶段任务草稿，确认后落库到项目。"
+        description="把学习目标拆成分阶段、可编辑的任务清单，确认后加入项目。"
         actions={
           drafts.length > 0 ? (
             <Button variant="secondary" size="sm" onClick={handleReject}>
@@ -156,11 +209,7 @@ export function AiBreakdownPage() {
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
         <Card>
-          <CardHeader
-            title="目标输入"
-            subtitle="未配置 Key 时后端使用内置 Mock，演示流程不受影响。"
-            action={<Badge tone="brand">OpenAI 兼容</Badge>}
-          />
+          <CardHeader title="目标输入" />
           <div className="grid gap-3.5">
             <Field label="目标描述">
               <Textarea
@@ -181,7 +230,7 @@ export function AiBreakdownPage() {
                   onChange={(e) => setWeeks(Number(e.target.value))}
                 />
               </Field>
-              <Field label="目标项目" hint="确认落库时把任务写入该项目。">
+              <Field label="目标项目" hint="生成的任务会创建到这个项目下。">
                 <Select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
                   <option value="">未选择</option>
                   {projects.map((project) => (
@@ -194,7 +243,7 @@ export function AiBreakdownPage() {
             </div>
             {projects.length === 0 && (
               <StateMessage>
-                还没有项目。可以先生成草稿预览，落库前请到「学习项目」创建一个项目。
+                还没有项目。可以先生成预览，创建任务前请到「学习项目」新建一个项目。
               </StateMessage>
             )}
             <Button onClick={handlePreview} disabled={loading || !goal.trim()}>
@@ -222,7 +271,7 @@ export function AiBreakdownPage() {
         <Card>
           <CardHeader
             title={tree ? `拆解预览 · ${tree.goal}` : "拆解预览"}
-            subtitle={tree ? `${drafts.length} 项任务草稿 · 共 ${tree.weeks} 周` : "生成后可逐项调整标题、描述和预计时长"}
+            subtitle={tree ? `${drafts.length} 项任务草稿 · 共 ${tree.weeks} 周` : "生成后可逐项调整标题、截止日期和时长"}
             action={drafts.length > 0 ? <Badge tone="success">{drafts.length} 项</Badge> : undefined}
           />
 
@@ -258,9 +307,16 @@ export function AiBreakdownPage() {
                             <p className="min-w-0 text-[0.95rem] font-semibold text-ink">{draft.title}</p>
                             <PriorityBadge priority={draft.priority} />
                           </div>
-                          <div className="grid gap-3 sm:grid-cols-[1.3fr_0.7fr_0.7fr]">
-                            <Field label="任务标题">
-                              <Input value={draft.title} onChange={(e) => handleEdit(draft.id, "title", e.target.value)} />
+                          <Field label="任务标题">
+                            <Input value={draft.title} onChange={(e) => handleEdit(draft.id, "title", e.target.value)} />
+                          </Field>
+                          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                            <Field label="截止日期">
+                              <Input
+                                type="date"
+                                value={draft.dueDate}
+                                onChange={(e) => handleEdit(draft.id, "dueDate", e.target.value)}
+                              />
                             </Field>
                             <Field label="预计分钟">
                               <Input
@@ -309,13 +365,13 @@ export function AiBreakdownPage() {
 
           {drafts.length > 0 && !confirmed && (
             <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
-              {!projectId && <span className="mr-auto text-[0.8rem] text-muted">请选择目标项目后落库</span>}
+              {!projectId && <span className="mr-auto text-[0.8rem] text-muted">请先选择目标项目</span>}
               <Button variant="secondary" onClick={handleReject}>
                 放弃
               </Button>
               <Button onClick={handleConfirm} disabled={committing || !projectId}>
                 <IconTasks size={15} />
-                {committing ? "创建中" : "确认落库"}
+                {committing ? "创建中" : "确认创建"}
               </Button>
             </div>
           )}

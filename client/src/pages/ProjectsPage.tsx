@@ -232,7 +232,7 @@ export function ProjectsPage() {
         open={isFormOpen}
         onClose={closeForm}
         title={editingId ? "编辑项目" : "新建项目"}
-        subtitle="项目会先写入本地 IndexedDB，再进入 outbox 等待同步。"
+        subtitle="填写项目信息，保存后即可在列表中使用。"
         footer={
           <>
             <Button variant="secondary" onClick={closeForm}>
@@ -316,7 +316,7 @@ export function ProjectsPage() {
           </>
         }
       >
-        <StateMessage kind="error">删除后仍可通过同步冲突策略保留更高版本；当前操作不会自动合并远端数据。</StateMessage>
+        <StateMessage kind="error">删除后将从列表移除，此操作不可撤销。</StateMessage>
       </Modal>
     </div>
   );

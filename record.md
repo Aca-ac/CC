@@ -119,3 +119,26 @@
 - 改动目的：按用户反馈把产品进一步打磨——布局质感（阴影/层次）、动效微交互、Markdown 渲染、减少 emoji；并修复 v1.0.1 桌面发布失败。
 - 验证结果：`npm run build`（client）通过；`npx vitest run` 全绿（25 文件 / 68 测试）；Playwright 实机截图核对深/浅主题卡片质感与 eyebrow 竖条。
 - 待办：用户反馈的「部分页面文字重复」（候选：空列表页 header 与空状态各有一个「新建X」按钮）待确认具体页面后再改；网页版同源的统计页崩溃仍需重新部署前端才能在线修复。
+
+## 2026-06-20 收尾阶段 5（青蓝主题 + 多项功能完善）
+
+- 改动文件：
+  - 主题/质感/动效（#1）：`client/src/styles/global.css`（主色由靛蓝改为青蓝 cyan/teal，新增蓝→青渐变端点 `--grad-from/to`、`--on-accent` 前景色、随主色的 `--accent-shadow` 投影；新增缓慢漂浮的青蓝氛围背景 `.app-aurora` + keyframes，遵循 reduced-motion）、`client/src/components/AppLayout.tsx`（接入 aurora、品牌/选中态改用渐变与 `--on-accent`、主区域加宽至 1320px 并收紧留白）、`client/src/components/ui/Button.tsx`（主按钮投影/前景跟随主题）。
+  - 日历小时时间轴 + 前后切换（#2）：`client/src/pages/CalendarPage.tsx`（周视图改为小时级时间轴：星期表头吸顶、按小时铺排任务、优先级色条；新增锚点日期 + 上一周/下一周（月视图为上/下月）+「今天」导航；修复右上「导入项目」下拉被裁剪：限定 40 宽、补足箭头空间，文案改「选择项目…」）。
+  - 设置精简 + 自定义模型名 + 退出登录（#3）：后端 `ai_settings` 增 `model` 列（`entity/AiSettings`、`UpdateAiSettingsRequest`/`AiSettingsResponse` 增字段并保留向后兼容构造器、`AiSettingsService` 落库/读取/`getModel`、`AiProviderFactory.resolveModel` 用户模型优先回落默认、`database/mysql/schema.sql` + `schema-test.sql` 加列、`SyncSchemaInitializer` 幂等 `ALTER TABLE ai_settings ADD COLUMN model` 兼容旧库）；前端 `apiClient` 类型加 `model`，`SettingsPage` 大幅精简（移除服务 API 地址卡片与静态同步策略卡片，新增账号卡片 + 退出登录，AI 卡片加模型名输入，文案口语化）。
+  - 静默自动同步（#4）：`client/src/hooks/useSync.ts`（已登录且在线时自动同步：挂载即同步、本地写入即时推送（去抖）、网络恢复补同步、20s 心跳回拉）、`client/src/storage/repositories/outboxRepository.ts`（入队广播 `chronos:outbox-changed`）、`client/src/components/SyncStatusChip.tsx`（改读 auth，登录非离线时启用自动同步，仍可点击手动）。
+  - 习惯打卡持久化 + 庆祝弹窗（#5）：`client/src/hooks/useHabits.ts`（「今日已打卡」按日期+习惯 id 持久化到 localStorage，跨天失效，切页返回不再丢失；checkin 返回最新连续天数）、`client/src/pages/HabitsPage.tsx`（打卡成功弹出带勾选光环 + 连续天数的庆祝动画）。
+  - AI 拆解含截止时间 + 进度不丢失（#6）：后端 `BreakdownCommitRequest.CommitTaskNode` 增 `dueTime`（保留向后兼容构造器）、`AiService.createTaskTree` 写入 `dueTime`；前端 `apiClient.CommitTaskNode` 加 `dueTime`，`AiBreakdownPage` 草稿新增可编辑截止日期（默认按阶段在周期内铺排）、整页草稿持久化到 sessionStorage（切页返回不丢失，确认/放弃后清除）。
+  - 文案去废话（#7）：`AiBreakdownPage`/`ProjectsPage`/`TasksPage`/`LearningLogsPage`/`SettingsPage` 移除「IndexedDB / outbox / 落库 / 内置 Mock / 同步冲突」等实现细节文案，改为面向用户的说明。
+  - 登录界面重做（#8）：`client/src/pages/{LoginPage,RegisterPage}.tsx`（青蓝渐变品牌侧 + 表单侧的分栏布局、aurora 背景，去掉硬编码靛蓝阴影；保留离线守卫与各 aria-label/必需文案以兼容测试）。
+  - NSIS 安装包修复（#9）：`client/package.json` 移除全局 `artifactName`，改为 `nsis` 与 `portable` 各自命名（`Chronos-Setup-` / `Chronos-Portable-`），消除两个 target 同名覆盖、确保 release 内含真正的 NSIS 安装包且自动更新（latest.yml）可用。
+- 改动目的：按用户本轮 9 项要求完善前端设计与多项功能，并修复 release 缺少 NSIS 安装包的问题。
+- 验证结果：前端 `npm run build --workspace client` 通过；`cd client && npx vitest run` 全绿（25 文件 / 68 测试）；后端 `.\server\mvnw.cmd test` 全绿（67 测试 0 失败，含 AiSettings 8 / AiBreakdown 6 / AiProvider 8）；Playwright 实机核对日历周视图深/浅主题（青蓝主题、今日列高亮、优先级色条、导入下拉不再裁剪、前后切换可用）。
+- 判断与待办：「账号注销」按口语习惯实现为「退出登录」（非删除账号）；自定义模型名落库需线上库迁移，已用启动幂等 `ALTER` 自动补列，无需手工 SQL；按用户要求移除设置页「服务 API 地址」展示（地址仍可经构建环境变量/本地存储配置）；`#9` 仅改打包配置，真正出包需重新发布版本（打 tag）由用户确认后进行；网页版需经 CD（合并到 main）部署方可在线生效。
+
+## 2026-06-20 收尾阶段 5b（注销账号 + 2.0.0 发布）
+
+- 改动文件：`server/.../auth/{AuthController,AuthService}.java`（新增 `DELETE /api/auth/account`：按外键依赖顺序硬删除当前用户的习惯/打卡/AI 建议/AI 设置/专注记录/学习日志/任务/同步记录/项目，最后删 users 并 `StpUtil.logout()`；任务自引用先置空 parent_task_id 再删）、`server/.../auth/AuthServiceTests.java`（新增：播种用户 A 全量数据 + 用户 B 项目，注销后断言 A 数据全清、B 保留）、`client/src/services/apiClient.ts`（`deleteAccount()`）、`client/src/pages/SettingsPage.tsx`（账号卡片新增「注销账号」危险操作 + 二次确认弹窗，需输入「注销」；成功后清本地 IndexedDB 与缓存并退出登录）、`client/package.json`（版本 1.0.1 → 2.0.0，`__APP_VERSION__` 随之更新）。
+- 改动目的：按用户要求把「注销」实现为永久删除账号及全部数据（区别于「退出登录」）；并将本轮全部改动作为 2.0.0 发布。
+- 验证结果：前端 `npm run build --workspace client` 通过；后端 `AuthServiceTests` 通过（1/0/0）。
+- 发布：提交 PR 至 main（用户负责合并 → 触发 CD 部署网页版），推送 `v2.0.0` tag 触发 `windows-installer.yml` 出包并 `gh release create`（含修好命名后的 NSIS 安装包 + latest.yml）。

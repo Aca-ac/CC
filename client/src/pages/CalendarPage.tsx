@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { IconCalendar, IconCheckCircle, IconClock, IconTasks, IconUpload } from "../components/icons";
+import { IconCalendar, IconCheckCircle, IconChevronRight, IconClock, IconTasks, IconUpload } from "../components/icons";
 import { PriorityBadge, StatusBadge } from "../components/StatusBadge";
 import {
   Badge,
@@ -78,6 +78,24 @@ function formatTime(value: string): string {
   });
 }
 
+function formatHour(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function taskHour(task: Task): number | null {
+  if (!task.dueTime) return null;
+  const hour = new Date(task.dueTime).getHours();
+  return Number.isNaN(hour) ? null : hour;
+}
+
+// 任务左侧色条按优先级着色（直接用主题变量，避免动态拼接类名被裁剪）。
+const PRIORITY_BAR_VAR: Record<Task["priority"], string> = {
+  LOW: "var(--success)",
+  MEDIUM: "var(--warning)",
+  HIGH: "var(--accent)",
+  URGENT: "var(--danger)",
+};
+
 function tasksForDate(tasks: Task[], currentKey: string): Task[] {
   return tasks
     .filter((task) => task.dueTime?.slice(0, 10) === currentKey)
@@ -92,7 +110,9 @@ export function CalendarPage() {
   const [importProjectId, setImportProjectId] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
   const [importNotice, setImportNotice] = useState<string | null>(null);
-  const baseDate = useMemo(() => new Date(), []);
+  // 锚点日期：可在周 / 月之间前后切换；今天高亮始终以真实当天为准。
+  const [anchorDate, setAnchorDate] = useState<Date>(() => new Date());
+  const todayKey = useMemo(() => dateKey(new Date()), []);
 
   useEffect(() => {
     if (!importProjectId && projects.length > 0) {
@@ -100,9 +120,18 @@ export function CalendarPage() {
     }
   }, [importProjectId, projects]);
 
-  const todayKey = dateKey(baseDate);
+  const goToday = () => setAnchorDate(new Date());
+  const goPrev = () =>
+    setAnchorDate((d) =>
+      view === "week" ? addDays(d, -7) : new Date(d.getFullYear(), d.getMonth() - 1, 1)
+    );
+  const goNext = () =>
+    setAnchorDate((d) =>
+      view === "week" ? addDays(d, 7) : new Date(d.getFullYear(), d.getMonth() + 1, 1)
+    );
+
   const weekCells = useMemo<DayCell[]>(() => {
-    const monday = getMonday(baseDate);
+    const monday = getMonday(anchorDate);
 
     return weekdays.map((day, index) => {
       const date = addDays(monday, index);
@@ -113,14 +142,14 @@ export function CalendarPage() {
         dateLabel: formatDateLabel(date),
         dateStr: currentKey,
         isToday: currentKey === todayKey,
-        isCurrentMonth: date.getMonth() === baseDate.getMonth(),
+        isCurrentMonth: date.getMonth() === anchorDate.getMonth(),
         tasks: tasksForDate(tasks, currentKey),
       };
     });
-  }, [baseDate, tasks, todayKey]);
+  }, [anchorDate, tasks, todayKey]);
 
   const monthCells = useMemo<DayCell[]>(() => {
-    const monthStart = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+    const monthStart = new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1);
     const gridStart = getMonday(monthStart);
 
     return Array.from({ length: 42 }, (_, index) => {
@@ -132,14 +161,24 @@ export function CalendarPage() {
         dateLabel: formatDateLabel(date),
         dateStr: currentKey,
         isToday: currentKey === todayKey,
-        isCurrentMonth: date.getMonth() === baseDate.getMonth(),
+        isCurrentMonth: date.getMonth() === anchorDate.getMonth(),
         tasks: tasksForDate(tasks, currentKey),
       };
     });
-  }, [baseDate, tasks, todayKey]);
+  }, [anchorDate, tasks, todayKey]);
+
+  // 周视图小时轴范围：默认 8:00–21:00，并自动扩展以容纳所有有时间的任务。
+  const hourRange = useMemo(() => {
+    const hours = weekCells
+      .flatMap((cell) => cell.tasks)
+      .map(taskHour)
+      .filter((h): h is number => h !== null);
+    const start = Math.max(0, Math.min(8, ...(hours.length ? hours : [8])));
+    const end = Math.min(24, Math.max(21, ...(hours.length ? hours.map((h) => h + 1) : [21])));
+    return Array.from({ length: end - start }, (_, i) => start + i);
+  }, [weekCells]);
 
   const metricCells = view === "week" ? weekCells : monthCells.filter((cell) => cell.isCurrentMonth);
-  const renderedCells = view === "week" ? weekCells : monthCells;
   const visibleTaskCount = metricCells.reduce((sum, cell) => sum + cell.tasks.length, 0);
   const completedVisible = metricCells.reduce(
     (sum, cell) => sum + cell.tasks.filter((task) => task.status === "DONE").length,
@@ -150,7 +189,7 @@ export function CalendarPage() {
     metricCells[0]
   );
   const currentRangeLabel =
-    view === "week" ? `${weekCells[0].dateStr} - ${weekCells[6].dateStr}` : formatMonthLabel(baseDate);
+    view === "week" ? `${weekCells[0].dateStr} ~ ${weekCells[6].dateStr}` : formatMonthLabel(anchorDate);
 
   const handleIcsImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -198,6 +237,7 @@ export function CalendarPage() {
         description="按截止日期查看任务密度，快速发现任务堆积的日期。"
         actions={
           <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* 周 / 月切换 */}
             <div className="inline-flex rounded-md border border-line bg-panel-muted p-1">
               <Button
                 size="sm"
@@ -218,19 +258,49 @@ export function CalendarPage() {
               </Button>
             </div>
 
-            <Select
-              aria-label="导入项目"
-              value={importProjectId}
-              onChange={(event) => setImportProjectId(event.target.value)}
-              className="h-8 min-w-36 py-1 text-[0.8rem]"
-            >
-              <option value="">导入项目</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </Select>
+            {/* 前后切换 */}
+            <div className="inline-flex items-center rounded-md border border-line bg-panel p-0.5">
+              <button
+                type="button"
+                onClick={goPrev}
+                aria-label={view === "week" ? "上一周" : "上个月"}
+                className="grid h-7 w-7 place-items-center rounded text-muted transition-colors hover:bg-panel-muted hover:text-ink"
+              >
+                <IconChevronRight size={16} className="rotate-180" />
+              </button>
+              <button
+                type="button"
+                onClick={goToday}
+                className="px-2 text-[0.8rem] font-medium text-ink transition-colors hover:text-brand"
+              >
+                今天
+              </button>
+              <button
+                type="button"
+                onClick={goNext}
+                aria-label={view === "week" ? "下一周" : "下个月"}
+                className="grid h-7 w-7 place-items-center rounded text-muted transition-colors hover:bg-panel-muted hover:text-ink"
+              >
+                <IconChevronRight size={16} />
+              </button>
+            </div>
+
+            {/* 导入 iCal 到指定项目 */}
+            <div className="w-40">
+              <Select
+                aria-label="导入到项目"
+                value={importProjectId}
+                onChange={(event) => setImportProjectId(event.target.value)}
+                className="h-9 py-0 text-[0.82rem]"
+              >
+                <option value="">选择项目…</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <input
               ref={fileInputRef}
               type="file"
@@ -243,7 +313,7 @@ export function CalendarPage() {
               variant="secondary"
               onClick={() => fileInputRef.current?.click()}
               disabled={!importProjectId}
-              title={!importProjectId ? "先选择导入项目" : "导入 iCal"}
+              title={!importProjectId ? "先选择导入到的项目" : "导入 iCal 日程"}
             >
               <IconUpload size={15} />
               导入 iCal
@@ -304,21 +374,90 @@ export function CalendarPage() {
           />
         )}
 
-        {!loading && !error && visibleTaskCount > 0 && (
+        {/* 周视图：小时级时间轴 */}
+        {!loading && !error && visibleTaskCount > 0 && view === "week" && (
+          <div className="max-h-[640px] overflow-auto rounded-xl border border-line bg-panel">
+            <div className="min-w-[740px]">
+              {/* 表头：星期 + 日期（吸顶） */}
+              <div
+                className="sticky top-0 z-10 grid border-b border-line bg-panel/95 backdrop-blur"
+                style={{ gridTemplateColumns: "56px repeat(7, minmax(0, 1fr))" }}
+              >
+                <div />
+                {weekCells.map((cell) => (
+                  <div
+                    key={cell.dateStr}
+                    className={cn(
+                      "border-l border-line/70 px-1 py-2.5 text-center",
+                      cell.isToday && "bg-brand-soft"
+                    )}
+                  >
+                    <p className={cn("text-[0.8rem] font-semibold", cell.isToday ? "text-brand" : "text-ink")}>
+                      {cell.day}
+                    </p>
+                    <p className={cn("mt-0.5 text-[0.72rem] tabular-nums", cell.isToday ? "text-brand" : "text-muted")}>
+                      {cell.dateLabel}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* 小时行 */}
+              {hourRange.map((hour) => (
+                <div
+                  key={hour}
+                  className="grid"
+                  style={{ gridTemplateColumns: "56px repeat(7, minmax(0, 1fr))" }}
+                >
+                  <div className="border-b border-line/60 pr-2 pt-1.5 text-right text-[0.7rem] tabular-nums text-muted/80">
+                    {formatHour(hour)}
+                  </div>
+                  {weekCells.map((cell) => {
+                    const items = cell.tasks.filter((task) => taskHour(task) === hour);
+                    return (
+                      <div
+                        key={cell.dateStr}
+                        className={cn(
+                          "min-h-[52px] space-y-1 border-b border-l border-line/60 p-1.5 transition-colors",
+                          cell.isToday ? "bg-brand-soft/30" : "hover:bg-panel-muted/40"
+                        )}
+                      >
+                        {items.map((task) => (
+                          <Link
+                            key={task.id}
+                            to="/tasks"
+                            title={`${formatTime(task.dueTime!)} · ${task.title}`}
+                            className="block rounded-md border border-line/70 border-l-[3px] bg-panel px-2 py-1 shadow-soft transition-[transform,border-color] hover:-translate-y-px hover:border-brand/40"
+                            style={{ borderLeftColor: PRIORITY_BAR_VAR[task.priority] }}
+                          >
+                            <p className="truncate text-[0.74rem] font-medium text-ink">{task.title}</p>
+                            <p className="text-[0.66rem] tabular-nums text-muted">{formatTime(task.dueTime!)}</p>
+                          </Link>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 月视图：日期网格 */}
+        {!loading && !error && visibleTaskCount > 0 && view === "month" && (
           <motion.div
             variants={staggerContainer(0.035)}
             initial="hidden"
             animate="show"
-            className={cn("grid gap-3", view === "week" ? "lg:grid-cols-7" : "sm:grid-cols-2 xl:grid-cols-7")}
+            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7"
           >
-            {renderedCells.map((cell) => (
+            {monthCells.map((cell) => (
               <motion.div key={cell.dateStr} variants={fadeUp} className="min-w-0">
                 <div
                   className={cn(
-                    "flex h-full flex-col rounded-lg border bg-surface p-3",
-                    view === "week" ? "min-h-[188px]" : "min-h-[132px]",
+                    "flex h-full flex-col rounded-lg border bg-surface p-3 min-h-[132px]",
                     cell.isToday ? "border-brand shadow-soft" : "border-line",
-                    view === "month" && !cell.isCurrentMonth && "opacity-50"
+                    !cell.isCurrentMonth && "opacity-50"
                   )}
                 >
                   <div className="mb-3 flex items-start justify-between gap-2">

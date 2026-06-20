@@ -1,6 +1,15 @@
 import { getDB } from "../db";
 import type { OutboxValue, OutboxStatus } from "../db";
 
+/** 本地写入入队后广播，供同步层做即时静默同步（见 useSync）。 */
+export const OUTBOX_CHANGED_EVENT = "chronos:outbox-changed";
+
+function notifyOutboxChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(OUTBOX_CHANGED_EVENT));
+  }
+}
+
 export class OutboxRepository {
   async findAll(accountId: string): Promise<OutboxValue[]> {
     const db = await getDB();
@@ -21,6 +30,7 @@ export class OutboxRepository {
   async create(entry: OutboxValue): Promise<void> {
     const db = await getDB();
     await db.add("outbox", entry);
+    notifyOutboxChanged();
   }
 
   async updateStatus(

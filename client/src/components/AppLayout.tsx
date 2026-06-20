@@ -46,8 +46,8 @@ function SidebarContent({
       {/* Brand */}
       <div className={cn("flex items-center pt-1", expanded ? "gap-2.5 px-2" : "justify-center px-0")}>
         <span
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-base font-bold text-white shadow-[0_3px_10px_rgba(79,70,229,0.35)]"
-          style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-strong))" }}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-base font-bold text-[var(--on-accent)] shadow-[0_3px_12px_var(--accent-shadow-strong)]"
+          style={{ background: "linear-gradient(135deg, var(--grad-from), var(--grad-to))" }}
           aria-label="Chronos 应用图标"
         >
           C
@@ -88,10 +88,10 @@ function SidebarContent({
                     <motion.span
                       layoutId="nav-active-pill"
                       className={cn(
-                        "absolute rounded-md shadow-[0_3px_10px_rgba(79,70,229,0.28)]",
+                        "absolute rounded-md shadow-[0_3px_10px_var(--accent-shadow)]",
                         expanded ? "inset-0" : "left-1 top-1/2 h-9 w-9 -translate-y-1/2"
                       )}
-                      style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-strong))" }}
+                      style={{ background: "linear-gradient(135deg, var(--grad-from), var(--grad-to))" }}
                       transition={{ type: "spring", stiffness: 420, damping: 34 }}
                     />
                   )}
@@ -99,7 +99,7 @@ function SidebarContent({
                     className={cn(
                       "relative z-10 flex min-w-0 items-center text-[0.9rem] font-medium transition-colors duration-150",
                       expanded ? "gap-3" : "justify-center",
-                      isActive ? "text-white" : "text-muted hover:text-ink"
+                      isActive ? "text-[var(--on-accent)]" : "text-muted hover:text-ink"
                     )}
                   >
                     <Icon size={18} strokeWidth={2.1} />
@@ -214,15 +214,8 @@ export function AppLayout({ navigation, children }: AppLayoutProps) {
 
   return (
     <div className="relative h-[100dvh] overflow-hidden bg-surface">
-      {/* 顶部极淡光晕——克制即可，避免「AI 渐变大背景」观感 */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-40 opacity-50 dark:opacity-0"
-        style={{
-          background:
-            "radial-gradient(50% 100% at 16% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 72%)",
-        }}
-      />
+      {/* 青蓝氛围光晕——缓慢漂浮，克制不抢内容 */}
+      <div aria-hidden className="app-aurora" />
 
       <div className="relative z-10 grid h-full lg:grid-cols-[72px_minmax(0,1fr)]">
         {/* Desktop sidebar — 固定窄栏；悬停图标浮出文字提示，整体不再展开 */}
@@ -252,13 +245,13 @@ export function AppLayout({ navigation, children }: AppLayoutProps) {
             </div>
           </div>
 
-          <main className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
+          <main className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-8 sm:py-6">
             <motion.div
               key={location.pathname}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={pageTransition}
-              className="mx-auto w-full max-w-[1180px]"
+              className="mx-auto w-full max-w-[1320px]"
             >
               {children}
             </motion.div>

@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS ai_settings (
     encrypted_key VARCHAR(1024) NOT NULL COMMENT 'AES-GCM 加密后的 API Key（Base64）',
     is_custom TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否用户自带 Key（BYOK）',
     masked_key VARCHAR(64) NULL COMMENT '脱敏展示用 Key',
+    model VARCHAR(128) NULL COMMENT '用户指定的调用模型名（空则用服务端默认）',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY uk_ai_settings_user_provider (user_id, provider),

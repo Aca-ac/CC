@@ -536,7 +536,7 @@ export function TasksPage() {
         open={isFormOpen}
         onClose={closeForm}
         title={editingId ? "编辑任务" : "新建任务"}
-        subtitle="任务会先写入本地存储，再通过 outbox 同步。"
+        subtitle="填写任务信息，保存后会出现在任务列表中。"
         width={620}
         footer={
           <>
@@ -670,7 +670,7 @@ export function TasksPage() {
           </>
         }
       >
-        <StateMessage kind="error">删除仅改变当前账户的本地数据和 outbox，不会触发自动冲突合并。</StateMessage>
+        <StateMessage kind="error">删除后该任务将从列表移除，此操作不可撤销。</StateMessage>
       </Modal>
     </div>
   );

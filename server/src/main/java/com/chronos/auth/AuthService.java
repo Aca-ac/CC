@@ -9,6 +9,7 @@ import com.chronos.auth.dto.RegisterRequest;
 import com.chronos.entity.User;
 import com.chronos.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private final UserMapper userMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     // 定义一个固定的盐值（工业规范：生产环境建议写在 application.yml 中读取）
     private static final String SALT = "Chronos_Salt_998243";
@@ -65,6 +67,46 @@ public class AuthService {
     }
 
     public void logout() {
+        StpUtil.logout();
+    }
+
+    /**
+     * 注销账号：永久删除当前用户及其全部关联数据（不可恢复）。
+     * 按外键依赖顺序硬删除子表，最后删 users 并清除会话。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteAccount() {
+        String userId = StpUtil.getLoginIdAsString();
+
+        // 习惯打卡 → 习惯
+        jdbcTemplate.update(
+                "DELETE FROM habit_checkins WHERE habit_id IN (SELECT id FROM habits WHERE user_id = ?)", userId);
+        jdbcTemplate.update("DELETE FROM habits WHERE user_id = ?", userId);
+
+        // AI 建议、AI 设置
+        jdbcTemplate.update("DELETE FROM ai_advices WHERE user_id = ?", userId);
+        jdbcTemplate.update("DELETE FROM ai_settings WHERE user_id = ?", userId);
+
+        // 专注记录、学习日志（依赖 tasks / projects，先删）
+        jdbcTemplate.update(
+                "DELETE FROM focus_sessions WHERE user_id = ? "
+                        + "OR task_id IN (SELECT id FROM tasks WHERE project_id IN (SELECT id FROM projects WHERE user_id = ?))",
+                userId, userId);
+        jdbcTemplate.update(
+                "DELETE FROM learning_logs WHERE project_id IN (SELECT id FROM projects WHERE user_id = ?)", userId);
+
+        // 任务：自引用，先断开父子关系再删除
+        jdbcTemplate.update(
+                "UPDATE tasks SET parent_task_id = NULL WHERE project_id IN (SELECT id FROM projects WHERE user_id = ?)",
+                userId);
+        jdbcTemplate.update(
+                "DELETE FROM tasks WHERE project_id IN (SELECT id FROM projects WHERE user_id = ?)", userId);
+
+        // 同步记录、项目、用户
+        jdbcTemplate.update("DELETE FROM sync_records WHERE user_id = ?", userId);
+        jdbcTemplate.update("DELETE FROM projects WHERE user_id = ?", userId);
+        jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
+
         StpUtil.logout();
     }
 }

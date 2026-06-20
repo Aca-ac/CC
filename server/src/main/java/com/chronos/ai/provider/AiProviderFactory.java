@@ -87,7 +87,7 @@ public class AiProviderFactory {
         if (key == null || key.isBlank()) {
             return new MockProvider();
         }
-        return new DeepSeekProvider(deepseekEndpoint, deepseekModel, key);
+        return new DeepSeekProvider(deepseekEndpoint, resolveModel(userId, "DEEPSEEK", deepseekModel), key);
     }
 
     private AiProvider createMiMoProvider(String userId) {
@@ -97,7 +97,7 @@ public class AiProviderFactory {
         if (key == null || key.isBlank()) {
             return new MockProvider();
         }
-        return new MiMoProvider(mimoEndpoint, mimoModel, key);
+        return new MiMoProvider(mimoEndpoint, resolveModel(userId, "MIMO", mimoModel), key);
     }
 
     private AiProvider createOpenAiProvider(String userId) {
@@ -107,6 +107,12 @@ public class AiProviderFactory {
         if (key == null || key.isBlank()) {
             return new MockProvider();
         }
-        return new OpenAiCompatibleProvider(openaiEndpoint, openaiModel, key);
+        return new OpenAiCompatibleProvider(openaiEndpoint, resolveModel(userId, "OPENAI", openaiModel), key);
+    }
+
+    /** 用户为该 provider 指定模型时优先使用，否则回落到服务端默认模型。 */
+    private String resolveModel(String userId, String provider, String fallbackModel) {
+        String userModel = aiSettingsService.getModel(userId, provider);
+        return (userModel != null && !userModel.isBlank()) ? userModel : fallbackModel;
     }
 }

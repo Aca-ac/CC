@@ -5,6 +5,7 @@ import com.chronos.auth.dto.LoginRequest;
 import com.chronos.auth.dto.RegisterRequest;
 import com.chronos.common.ApiResponse;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,6 +33,13 @@ public class AuthController {
     @PostMapping("/logout")
     public ApiResponse<Void> logout() {
         authService.logout();
+        return ApiResponse.ok(null);
+    }
+
+    /** 注销账号：永久删除当前用户及其全部数据。 */
+    @DeleteMapping("/account")
+    public ApiResponse<Void> deleteAccount() {
+        authService.deleteAccount();
         return ApiResponse.ok(null);
     }
 }
