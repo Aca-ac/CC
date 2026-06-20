@@ -1,6 +1,8 @@
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   Cell,
   Pie,
@@ -39,22 +41,44 @@ const tooltipStyle = {
 export function StatsPage() {
   const { stats, loading, error, cached, refresh } = useStats();
 
-  const totalMinutes = stats?.dailyMinutes.reduce((sum, day) => sum + day.minutes, 0) ?? 0;
+  // 旧版本写入的过期缓存可能缺少数组字段，这里统一做空值兜底，避免一打开就崩溃。
+  const dailyMinutes = stats?.dailyMinutes ?? [];
+  const projectData = stats?.projectDistribution ?? [];
+  const totalMinutes = dailyMinutes.reduce((sum, day) => sum + day.minutes, 0);
   const hasData =
     stats !== null &&
-    (stats.totalCompleted > 0 ||
-      stats.dailyMinutes.some((day) => day.minutes > 0) ||
-      stats.projectDistribution.some((project) => project.minutes > 0));
-  const trendData = stats?.dailyMinutes.map((day) => ({
+    ((stats.totalCompleted ?? 0) > 0 ||
+      dailyMinutes.some((day) => day.minutes > 0) ||
+      projectData.some((project) => project.minutes > 0));
+  const trendData = dailyMinutes.map((day) => ({
     ...day,
     label: formatDateLabel(day.date),
-  })) ?? [];
-  const projectData = stats?.projectDistribution ?? [];
+  }));
+
+  // 时间构成：专注时长 vs 其他学习（日志）时长
+  const totalFocus = dailyMinutes.reduce((sum, day) => sum + (day.focusMinutes ?? 0), 0);
+  const otherMinutes = Math.max(0, totalMinutes - totalFocus);
+  const timeComposition = [
+    { name: "专注时长", minutes: totalFocus, color: "var(--focus)" },
+    { name: "日志记录", minutes: otherMinutes, color: "var(--info)" },
+  ].filter((item) => item.minutes > 0);
+
+  // 项目进度：各项目已完成任务占比（取进度最高的前 6 个）
+  const progressData = projectData
+    .map((project) => ({
+      name: project.projectName,
+      progress:
+        project.totalTasks > 0
+          ? Math.round((project.completedTasks / project.totalTasks) * 100)
+          : 0,
+    }))
+    .sort((a, b) => b.progress - a.progress)
+    .slice(0, 6);
 
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Statistics"
+        eyebrow="数据复盘"
         title="学习统计"
         description="追踪本周完成数、学习时长和项目投入分布。"
         actions={
@@ -208,6 +232,113 @@ export function StatsPage() {
                 </div>
               ) : (
                 <EmptyState icon={IconTasks} title="暂无分布数据" compact />
+              )}
+            </Card>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <Card>
+              <CardHeader
+                title="时间构成"
+                subtitle="本周专注与日志记录的时长占比"
+                action={<Badge tone="focus">{totalMinutes} 分钟</Badge>}
+              />
+              {timeComposition.length > 0 ? (
+                <div className="grid items-center gap-4 sm:grid-cols-[170px_minmax(0,1fr)]">
+                  <div className="h-[180px] min-w-0" role="img" aria-label="时间构成">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={timeComposition}
+                          dataKey="minutes"
+                          nameKey="name"
+                          innerRadius={46}
+                          outerRadius={72}
+                          paddingAngle={2}
+                        >
+                          {timeComposition.map((entry) => (
+                            <Cell key={entry.name} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={tooltipStyle}
+                          formatter={(value, name) => [`${value} 分钟`, name]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="space-y-2">
+                    {timeComposition.map((item) => (
+                      <div
+                        key={item.name}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                            style={{ background: item.color }}
+                          />
+                          <span className="truncate text-[0.84rem] font-medium text-ink">{item.name}</span>
+                        </div>
+                        <span className="shrink-0 text-[0.82rem] text-muted">
+                          {item.minutes} 分钟
+                          {totalMinutes > 0 ? ` · ${Math.round((item.minutes / totalMinutes) * 100)}%` : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <EmptyState icon={IconClock} title="暂无时长记录" compact />
+              )}
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="项目进度"
+                subtitle="各项目已完成任务占比"
+                action={<Badge tone="neutral">{progressData.length} 项</Badge>}
+              />
+              {progressData.length > 0 ? (
+                <div className="h-[220px] w-full" role="img" aria-label="项目进度">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={progressData}
+                      layout="vertical"
+                      margin={{ top: 4, right: 20, left: 8, bottom: 4 }}
+                    >
+                      <CartesianGrid stroke="var(--line)" strokeDasharray="3 3" horizontal={false} />
+                      <XAxis
+                        type="number"
+                        domain={[0, 100]}
+                        tick={{ fill: "var(--muted)", fontSize: 12 }}
+                        axisLine={false}
+                        tickLine={false}
+                        unit="%"
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={92}
+                        tick={{ fill: "var(--muted)", fontSize: 12 }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={tooltipStyle}
+                        cursor={{ fill: "var(--panel-muted)" }}
+                        formatter={(value) => [`${value}%`, "完成度"]}
+                      />
+                      <Bar dataKey="progress" radius={[0, 4, 4, 0]} maxBarSize={22}>
+                        {progressData.map((entry, index) => (
+                          <Cell key={entry.name} fill={chartColors[index % chartColors.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <EmptyState icon={IconTasks} title="暂无项目进度" compact />
               )}
             </Card>
           </div>

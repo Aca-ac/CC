@@ -18,7 +18,14 @@ function getCachedStats(): WeeklyStatsDTO | null {
       localStorage.removeItem(CACHE_KEY);
       return null;
     }
-    return parsed.data;
+    // 校验缓存结构：旧版本写入的缓存可能缺少数组字段，
+    // 直接当作无缓存并清除，避免下游 .reduce/.map 在缺字段时崩溃。
+    const data = parsed?.data;
+    if (!data || !Array.isArray(data.dailyMinutes) || !Array.isArray(data.projectDistribution)) {
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+    return data;
   } catch {
     return null;
   }
