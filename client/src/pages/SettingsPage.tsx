@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
+  IconAlert,
   IconCheck,
+  IconCheckCircle,
   IconLogout,
   IconRefresh,
+  IconSparkles,
   IconTrash,
   IconUpload,
   IconUser,
@@ -387,16 +391,102 @@ export function SettingsPage() {
             )}
           </div>
           {desktopUpdateStatus && (
-            <StateMessage kind={desktopUpdateStatus.state === "error" ? "error" : "info"}>
-              {desktopUpdateStatus.state === "checking" && "正在检查更新。"}
-              {desktopUpdateStatus.state === "available" && `已发现 ${desktopUpdateStatus.version ?? ""}，请确认下载。`}
-              {desktopUpdateStatus.state === "not-available" && "当前已是最新版本。"}
-              {desktopUpdateStatus.state === "downloading" && `正在下载${desktopUpdateStatus.percent === undefined ? "" : ` ${desktopUpdateStatus.percent}%`}。`}
-              {desktopUpdateStatus.state === "downloaded" && "下载完成，请确认重启并安装。"}
-              {desktopUpdateStatus.state === "installing" && "正在重启并安装更新。"}
-              {desktopUpdateStatus.state === "unsupported" && (desktopUpdateStatus.message ?? "请使用 Windows 安装版获得自动更新。")}
-              {desktopUpdateStatus.state === "error" && (desktopUpdateStatus.message ?? "更新失败，请稍后再试。")}
-            </StateMessage>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={desktopUpdateStatus.state}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {desktopUpdateStatus.state === "downloading" ? (
+                  <div className="rounded-md border border-line bg-panel-muted/60 p-3">
+                    <div className="mb-2 flex items-center justify-between text-[0.82rem]">
+                      <span className="flex items-center gap-1.5 font-medium text-brand">
+                        <IconUpload size={14} />
+                        {desktopUpdateStatus.message ?? "正在下载更新…"}
+                      </span>
+                      <span className="font-serif tabular-nums text-ink">
+                        {desktopUpdateStatus.percent ?? 0}%
+                      </span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-line/70">
+                      {(desktopUpdateStatus.percent ?? 0) > 0 ? (
+                        <motion.div
+                          className="h-full rounded-full"
+                          style={{ background: "linear-gradient(90deg, var(--grad-from), var(--grad-to))" }}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${desktopUpdateStatus.percent ?? 0}%` }}
+                          transition={{ ease: "easeOut", duration: 0.4 }}
+                        />
+                      ) : (
+                        // 0%/准备阶段：来回扫光的不确定进度条，避免看起来「卡住」
+                        <motion.div
+                          className="h-full w-1/3 rounded-full"
+                          style={{ background: "linear-gradient(90deg, transparent, var(--accent), transparent)" }}
+                          animate={{ x: ["-120%", "320%"] }}
+                          transition={{ duration: 1.15, repeat: Infinity, ease: "easeInOut" }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <StateMessage kind={desktopUpdateStatus.state === "error" ? "error" : "info"}>
+                    {desktopUpdateStatus.state === "checking" && (
+                      <>
+                        <IconRefresh size={15} className="animate-spin" />
+                        正在检查更新…
+                      </>
+                    )}
+                    {desktopUpdateStatus.state === "available" && (
+                      <>
+                        <motion.span
+                          className="inline-flex text-brand"
+                          animate={{ scale: [1, 1.18, 1] }}
+                          transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                        >
+                          <IconSparkles size={15} />
+                        </motion.span>
+                        已发现新版本 {desktopUpdateStatus.version ?? ""}，请确认下载。
+                      </>
+                    )}
+                    {desktopUpdateStatus.state === "not-available" && (
+                      <>
+                        <IconCheckCircle size={15} className="text-success" />
+                        当前已是最新版本。
+                      </>
+                    )}
+                    {desktopUpdateStatus.state === "downloaded" && (
+                      <>
+                        <motion.span
+                          className="inline-flex text-success"
+                          initial={{ scale: 0.6 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring", stiffness: 520, damping: 16 }}
+                        >
+                          <IconCheck size={15} />
+                        </motion.span>
+                        下载完成，请确认重启并安装。
+                      </>
+                    )}
+                    {desktopUpdateStatus.state === "installing" && (
+                      <>
+                        <IconRefresh size={15} className="animate-spin" />
+                        正在重启并安装更新…
+                      </>
+                    )}
+                    {desktopUpdateStatus.state === "unsupported" &&
+                      (desktopUpdateStatus.message ?? "请使用 Windows 安装版获得自动更新。")}
+                    {desktopUpdateStatus.state === "error" && (
+                      <>
+                        <IconAlert size={15} />
+                        {desktopUpdateStatus.message ?? "更新失败，请稍后再试。"}
+                      </>
+                    )}
+                  </StateMessage>
+                )}
+              </motion.div>
+            </AnimatePresence>
           )}
           {updateResult && <StateMessage kind="info">{updateResult.message}</StateMessage>}
           {updateError && <StateMessage kind="error">{updateError}</StateMessage>}

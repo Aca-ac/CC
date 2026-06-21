@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, Menu, shell, type WebContents } from "electron";
-import { autoUpdater, type UpdateInfo } from "electron-updater";
+import { autoUpdater, type UpdateCheckResult, type UpdateInfo } from "electron-updater";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -25,6 +25,10 @@ type DesktopUpdateStatus = {
 };
 
 let updaterConfigured = false;
+// 最近一次检查结果（持有 cancellationToken，供下载阶段取消差量下载用）。
+let pendingCheck: UpdateCheckResult | null = null;
+// 差量下载在该时长内毫无进度则判定为卡住，回退整包下载。
+const DIFFERENTIAL_STALL_MS = 25_000;
 
 function isNativeUpdaterSupported() {
   return app.isPackaged && process.platform === "win32";
@@ -68,6 +72,8 @@ function configureAutoUpdater() {
   updaterConfigured = true;
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
+  // 默认保留差量下载（blockmap 增量，省服务器带宽）；仅在卡住时由看门狗回退整包。
+  autoUpdater.disableDifferentialDownload = false;
 
   autoUpdater.on("checking-for-update", () => {
     emitUpdateStatus({ state: "checking" });
@@ -109,7 +115,9 @@ async function checkNativeUpdate(): Promise<DesktopUpdateStatus> {
 
   emitUpdateStatus({ state: "checking" });
   try {
-    await autoUpdater.checkForUpdates();
+    // 每次检查都先恢复差量优先；记录结果以便下载阶段取出 cancellationToken。
+    autoUpdater.disableDifferentialDownload = false;
+    pendingCheck = await autoUpdater.checkForUpdates();
     return { state: "checking" };
   } catch (error) {
     const status: DesktopUpdateStatus = { state: "error", message: friendlyUpdateError(error) };
@@ -124,13 +132,51 @@ async function downloadNativeUpdate(): Promise<DesktopUpdateStatus> {
   }
 
   emitUpdateStatus({ state: "downloading", percent: 0 });
+
+  let sawProgress = false;
+  let fellBackToFull = false;
+  const markProgress = (progress: { percent?: number }) => {
+    if ((progress?.percent ?? 0) > 0) sawProgress = true;
+  };
+  autoUpdater.on("download-progress", markProgress);
+
+  // 看门狗：差量下载默认优先（省带宽）；若长时间 0 进度（多为代理无法处理
+  // multipart/byteranges 导致卡住），取消差量、改整包下载兜底。
+  const watchdog = setTimeout(() => {
+    if (sawProgress || fellBackToFull) return;
+    fellBackToFull = true;
+    try {
+      pendingCheck?.cancellationToken?.cancel();
+    } catch {
+      // 取消失败可忽略：整包下载会重新发起。
+    }
+    autoUpdater.disableDifferentialDownload = true;
+    emitUpdateStatus({ state: "downloading", percent: 0, message: "差量下载无响应，已切换为完整下载…" });
+    autoUpdater
+      .checkForUpdates()
+      .then((result) => {
+        pendingCheck = result ?? pendingCheck;
+        return autoUpdater.downloadUpdate(pendingCheck?.cancellationToken);
+      })
+      .catch((error) => {
+        emitUpdateStatus({ state: "error", message: friendlyUpdateError(error) });
+      });
+  }, DIFFERENTIAL_STALL_MS);
+
   try {
-    await autoUpdater.downloadUpdate();
+    await autoUpdater.downloadUpdate(pendingCheck?.cancellationToken);
     return { state: "downloading", percent: 0 };
   } catch (error) {
+    // 被看门狗主动取消（切换整包）时的 reject 不算失败，整包下载已在进行。
+    if (fellBackToFull) {
+      return { state: "downloading", percent: 0 };
+    }
     const status: DesktopUpdateStatus = { state: "error", message: friendlyUpdateError(error) };
     emitUpdateStatus(status);
     return status;
+  } finally {
+    clearTimeout(watchdog);
+    autoUpdater.removeListener("download-progress", markProgress);
   }
 }
 
