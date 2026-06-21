@@ -232,7 +232,6 @@ export function CalendarPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="时间安排"
         title="日历计划"
         description="按截止日期查看任务密度，快速发现任务堆积的日期。"
         actions={

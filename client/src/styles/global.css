@@ -107,39 +107,41 @@
   color: var(--text);
 }
 
-/* ── Dark theme ─────────────────────────────────────────────────── */
+/* ── Dark theme — 中性黑灰，无蓝色光晕 ──────────────────────────── */
 .dark {
   color-scheme: dark;
 
-  --surface: #07131A;
-  --panel: #0F1F28;
-  --panel-muted: #162C36;
-  --text: #E6F0F4;
-  --muted: #8FA3AC;
-  --line: #21323C;
+  --surface: #0B0B0D;
+  --panel: #161619;
+  --panel-muted: #1F1F23;
+  --text: #ECECEE;
+  --muted: #9B9BA2;
+  --line: #2A2A30;
 
-  --accent: #22D3EE;
-  --accent-strong: #67E8F9;
-  --accent-soft: #0C2B36;
+  /* 青色仅作为交互强调色（按钮/选中态），不再做大面积氛围光 */
+  --accent: #2CC9DE;
+  --accent-strong: #56DAEC;
+  --accent-soft: #1C2A2D;
 
-  --grad-from: #38BDF8;
-  --grad-to: #22D3EE;
+  /* 深色下渐变收敛为低调青，避免发蓝光 */
+  --grad-from: #2BB4C6;
+  --grad-to: #2CC9DE;
   --on-accent: #04222B;
-  --accent-shadow: color-mix(in srgb, var(--accent) 30%, transparent);
-  --accent-shadow-strong: color-mix(in srgb, var(--accent) 46%, transparent);
+  --accent-shadow: color-mix(in srgb, var(--accent) 14%, transparent);
+  --accent-shadow-strong: color-mix(in srgb, var(--accent) 22%, transparent);
 
   --success: #34D399;
-  --success-soft: #0F2A22;
+  --success-soft: #16241E;
   --warning: #FBBF24;
-  --warning-soft: #2A2517;
+  --warning-soft: #28220F;
   --danger: #F87171;
-  --danger-soft: #2E1A1C;
+  --danger-soft: #2A1718;
   --info: #60A5FA;
-  --info-soft: #122231;
-  --focus: #818CF8;
-  --focus-soft: #1A1E33;
+  --info-soft: #18202B;
+  --focus: #8B93F8;
+  --focus-soft: #1C1D26;
   --habit: #FB923C;
-  --habit-soft: #2A1F14;
+  --habit-soft: #271C12;
 
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.6);
@@ -258,10 +260,10 @@ textarea {
   animation: aurora-drift-b 32s ease-in-out infinite alternate;
 }
 
+/* 深色模式不渲染氛围光晕——保持纯净黑灰，无蓝色光芒 */
 .dark .app-aurora::before,
 .dark .app-aurora::after {
-  opacity: 0.28;
-  filter: blur(88px);
+  display: none;
 }
 
 @keyframes aurora-drift-a {

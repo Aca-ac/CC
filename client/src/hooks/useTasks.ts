@@ -26,13 +26,24 @@ function orderValue(task: { orderIndex?: number; createdAt?: number }) {
   return task.orderIndex ?? task.createdAt ?? Number.MAX_SAFE_INTEGER;
 }
 
+// 截止时间排序权重：有截止时间的按时间先后，无截止时间的排在最后。
+function dueRank(task: { dueTime?: string }) {
+  if (!task.dueTime) return Number.MAX_SAFE_INTEGER;
+  const ts = Date.parse(task.dueTime);
+  return Number.isNaN(ts) ? Number.MAX_SAFE_INTEGER : ts;
+}
+
+// 先按截止日期，再按先后顺序（AI 拆解时写入的 orderIndex），最后用稳定 tie-breaker。
 function sortTaskValues(values: TaskValue[]): TaskValue[] {
-  return [...values].sort((a, b) => orderValue(a) - orderValue(b) || a.createdAt - b.createdAt);
+  return [...values].sort(
+    (a, b) => dueRank(a) - dueRank(b) || orderValue(a) - orderValue(b) || a.createdAt - b.createdAt
+  );
 }
 
 function sortTasks(values: Task[]): Task[] {
   return [...values].sort(
     (a, b) =>
+      dueRank(a) - dueRank(b) ||
       orderValue(a) - orderValue(b) ||
       a.title.localeCompare(b.title, "zh-CN") ||
       a.id.localeCompare(b.id)

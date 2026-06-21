@@ -136,7 +136,6 @@ export function HabitsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="每日坚持"
         title="习惯打卡"
         description="把重复行为变成连续记录，用连签天数和成就维持动力。"
         actions={

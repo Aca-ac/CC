@@ -1,9 +1,18 @@
-import { Fragment, useMemo, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
-import { motion } from "framer-motion";
 import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  IconCheck,
   IconCheckCircle,
   IconChevronRight,
-  IconClock,
   IconEdit,
   IconGrip,
   IconPlus,
@@ -87,6 +96,65 @@ function moveIdBefore(ids: string[], sourceId: string, targetId: string): string
   const targetIndex = withoutSource.indexOf(targetId);
   withoutSource.splice(targetIndex >= 0 ? targetIndex : withoutSource.length, 0, sourceId);
   return withoutSource;
+}
+
+/**
+ * 醒目的完成勾选控件：未完成为空心圆，完成为实心对号；
+ * 用户点击完成时播放一次弹性对号 + 扩散光环动画。
+ */
+function TaskCheck({ done, onToggle }: { done: boolean; onToggle: () => void }) {
+  const [burst, setBurst] = useState(false);
+  const mounted = useRef(false);
+  const prevDone = useRef(done);
+
+  useEffect(() => {
+    if (mounted.current && !prevDone.current && done) {
+      setBurst(true);
+      const timer = window.setTimeout(() => setBurst(false), 650);
+      prevDone.current = done;
+      return () => window.clearTimeout(timer);
+    }
+    prevDone.current = done;
+    mounted.current = true;
+  }, [done]);
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={done ? "标记为未完成" : "标记为已完成"}
+      aria-pressed={done}
+      className={cn(
+        "relative mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 transition-colors duration-200",
+        done
+          ? "border-success bg-success text-[var(--on-accent)] shadow-[0_2px_10px_color-mix(in_srgb,var(--success)_40%,transparent)]"
+          : "border-line bg-transparent text-transparent hover:border-success hover:text-success/40"
+      )}
+    >
+      <AnimatePresence>
+        {burst && (
+          <motion.span
+            key="burst"
+            aria-hidden
+            initial={{ scale: 0.7, opacity: 0.7 }}
+            animate={{ scale: 1.9, opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.55, ease: "easeOut" }}
+            className="pointer-events-none absolute inset-0 rounded-full border-2 border-success"
+          />
+        )}
+      </AnimatePresence>
+      <motion.span
+        key={done ? "done" : "todo"}
+        initial={{ scale: done ? 0 : 1, rotate: done ? -30 : 0 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: "spring", stiffness: 520, damping: 17 }}
+        className="grid place-items-center"
+      >
+        <IconCheck size={16} strokeWidth={3} />
+      </motion.span>
+    </button>
+  );
 }
 
 export function TasksPage() {
@@ -336,16 +404,19 @@ export function TasksPage() {
               >
                 <IconGrip size={15} />
               </span>
-              <button
-                type="button"
-                onClick={() => changeStatus(task.id, task.status === "DONE" ? "TODO" : "DONE")}
-                aria-label={task.status === "DONE" ? "标记为未完成" : "标记为已完成"}
-                className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-md border border-line bg-panel-muted text-muted transition-colors hover:border-brand hover:text-brand"
-              >
-                {task.status === "DONE" ? <IconCheckCircle size={17} /> : <IconClock size={17} />}
-              </button>
+              <TaskCheck
+                done={task.status === "DONE"}
+                onToggle={() => changeStatus(task.id, task.status === "DONE" ? "TODO" : "DONE")}
+              />
               <div className="min-w-0">
-                <h3 className="truncate text-[0.95rem] font-semibold text-ink">{task.title}</h3>
+                <h3
+                  className={cn(
+                    "truncate text-[0.95rem] font-semibold transition-colors",
+                    task.status === "DONE" ? "text-muted line-through" : "text-ink"
+                  )}
+                >
+                  {task.title}
+                </h3>
                 {task.description && (
                   <p className="mt-0.5 line-clamp-2 text-[0.82rem] text-muted">{task.description}</p>
                 )}
@@ -405,7 +476,6 @@ export function TasksPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="待办清单"
         title="任务管理"
         description="按项目、状态、标签和优先级整理学习任务。"
         actions={

@@ -26,7 +26,7 @@ import { TasksPage } from "./pages/TasksPage";
 
 const navigation: NavigationItem[] = [
   { path: "/dashboard", label: "今日看板", icon: IconDashboard },
-  { path: "/projects", label: "学习项目", icon: IconProjects },
+  { path: "/projects", label: "项目管理", icon: IconProjects },
   { path: "/tasks", label: "任务管理", icon: IconTasks },
   { path: "/logs", label: "日志与计时", icon: IconLogs },
   { path: "/calendar", label: "日历", icon: IconCalendar },

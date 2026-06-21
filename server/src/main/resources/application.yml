@@ -52,6 +52,10 @@ chronos:
     base-url: ${CHRONOS_AI_BASE_URL:https://api.openai.com/v1}
     model: ${CHRONOS_AI_MODEL:gpt-4o-mini}
     api-key: ${CHRONOS_AI_API_KEY:}
+    # 服务器内置 AI 分工：拆解走更强的 pro（高推理），每周建议走更快更省的 flash。
+    breakdown-model: ${CHRONOS_AI_BREAKDOWN_MODEL:deepseek-v4-pro}
+    breakdown-reasoning: ${CHRONOS_AI_BREAKDOWN_REASONING:high}
+    advice-model: ${CHRONOS_AI_ADVICE_MODEL:deepseek-v4-flash}
     encryption:
       master-key: ${CHRONOS_AI_MASTER_KEY:dev-master-key-change-me-32byte!}
     providers:

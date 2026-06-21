@@ -63,14 +63,15 @@ export function StatsPage() {
     { name: "日志记录", minutes: otherMinutes, color: "var(--info)" },
   ].filter((item) => item.minutes > 0);
 
-  // 项目进度：各项目已完成任务占比（取进度最高的前 6 个）
+  // 项目时间分布：只展示本周有投入时长的项目，避免 0 分钟项目造成空白扇区。
+  const timeProjects = projectData.filter((project) => project.minutes > 0);
+
+  // 项目进度：各项目累计已完成任务占比（只看有任务的项目，取前 6 个）。
   const progressData = projectData
+    .filter((project) => project.totalTasks > 0)
     .map((project) => ({
       name: project.projectName,
-      progress:
-        project.totalTasks > 0
-          ? Math.round((project.completedTasks / project.totalTasks) * 100)
-          : 0,
+      progress: Math.round((project.completedTasks / project.totalTasks) * 100),
     }))
     .sort((a, b) => b.progress - a.progress)
     .slice(0, 6);
@@ -78,7 +79,6 @@ export function StatsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="数据复盘"
         title="学习统计"
         description="追踪本周完成数、学习时长和项目投入分布。"
         actions={
@@ -185,22 +185,22 @@ export function StatsPage() {
               <CardHeader
                 title="项目时间分布"
                 subtitle="按项目汇总本周投入"
-                action={<Badge tone="neutral">{projectData.length} 项</Badge>}
+                action={<Badge tone="neutral">{timeProjects.length} 项</Badge>}
               />
-              {projectData.length > 0 ? (
+              {timeProjects.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-1 2xl:grid-cols-[220px_minmax(0,1fr)]">
                   <div className="h-[220px] min-w-0" role="img" aria-label="项目时间分布">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={projectData}
+                          data={timeProjects}
                           dataKey="minutes"
                           nameKey="projectName"
                           innerRadius={52}
                           outerRadius={82}
                           paddingAngle={2}
                         >
-                          {projectData.map((entry, index) => (
+                          {timeProjects.map((entry, index) => (
                             <Cell key={entry.projectId} fill={chartColors[index % chartColors.length]} />
                           ))}
                         </Pie>
@@ -213,7 +213,7 @@ export function StatsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    {projectData.map((project, index) => (
+                    {timeProjects.map((project, index) => (
                       <div
                         key={project.projectId}
                         className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2"

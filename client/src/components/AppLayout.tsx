@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { Transition } from "framer-motion";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import type { AuthSession } from "../contexts/AuthContext";
 import { cn } from "../lib/cn";
 import { pageTransition } from "../lib/motion";
 import { ThemeToggle } from "./ui/ThemeToggle";
@@ -18,6 +19,100 @@ export interface NavigationItem {
 interface AppLayoutProps {
   navigation: NavigationItem[];
   children: React.ReactNode;
+}
+
+/**
+ * 侧栏底部账号控件：头像贴合窄栏，悬停（或聚焦）弹出账号信息卡片，
+ * 提供「切换账号」「退出登录」操作。
+ */
+function SidebarUser({
+  expanded,
+  session,
+  logout,
+}: {
+  expanded: boolean;
+  session: AuthSession;
+  logout: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const initial = (session.name || session.email || "U").trim().charAt(0).toUpperCase();
+
+  const avatar = (
+    <span
+      className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[0.82rem] font-semibold text-[var(--on-accent)] shadow-[0_2px_8px_var(--accent-shadow)]"
+      style={{ background: "linear-gradient(135deg, var(--grad-from), var(--grad-to))" }}
+      aria-hidden
+    >
+      {initial}
+    </span>
+  );
+
+  const popover = (
+    <div
+      role="menu"
+      className={cn(
+        "absolute z-50 w-56 rounded-lg border border-line bg-panel p-2 shadow-float transition-[opacity,transform] duration-150",
+        expanded ? "bottom-full left-0 mb-2 origin-bottom" : "bottom-0 left-full origin-bottom-left pl-2",
+        open ? "visible opacity-100" : "pointer-events-none invisible opacity-0"
+      )}
+    >
+      <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
+        {avatar}
+        <div className="min-w-0">
+          <p className="truncate text-[0.86rem] font-semibold text-ink">{session.name}</p>
+          <p className="truncate text-[0.74rem] text-muted">{session.email || "本地账号"}</p>
+        </div>
+      </div>
+      <div className="my-1.5 h-px bg-line" />
+      <button
+        type="button"
+        role="menuitem"
+        onClick={logout}
+        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[0.84rem] text-ink transition-colors hover:bg-panel-muted"
+      >
+        <IconUser size={15} />
+        切换账号
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        onClick={logout}
+        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[0.84rem] text-danger transition-colors hover:bg-danger-soft"
+      >
+        <IconLogout size={15} />
+        退出登录
+      </button>
+    </div>
+  );
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocusCapture={() => setOpen(true)}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false);
+      }}
+    >
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`账号：${session.name}`}
+        className={cn(
+          "flex items-center rounded-md border border-line bg-panel transition-colors hover:border-brand/50",
+          expanded ? "w-full gap-2.5 px-2.5 py-1.5" : "h-10 w-10 justify-center px-0 py-0"
+        )}
+      >
+        {avatar}
+        {expanded && (
+          <span className="min-w-0 flex-1 truncate text-left text-[0.84rem] text-ink">{session.name}</span>
+        )}
+      </button>
+      {popover}
+    </div>
+  );
 }
 
 function SidebarContent({
@@ -154,35 +249,8 @@ function SidebarContent({
         <div className={cn("flex items-center", expanded ? "gap-2" : "flex-col gap-2")}>
           <ThemeToggle />
           {session ? (
-            <div
-              className={cn(
-                "flex min-w-0 items-center rounded-md border border-line bg-panel",
-                expanded ? "flex-1 gap-2 px-2.5 py-1.5" : "h-9 w-9 justify-center px-0 py-0"
-              )}
-              title={session.name}
-            >
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-brand-soft text-brand">
-                <IconUser size={15} />
-              </span>
-              <motion.span
-                initial={false}
-                animate={{ ...labelMotion, width: expanded ? 86 : 0 }}
-                transition={labelTransition}
-                className="min-w-0 flex-1 truncate text-[0.82rem] text-ink"
-              >
-                {session.name}
-              </motion.span>
-              {expanded && (
-                <button
-                  type="button"
-                  onClick={logout}
-                  title="登出"
-                  aria-label="登出"
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted transition-colors hover:bg-panel-muted hover:text-danger"
-                >
-                  <IconLogout size={15} />
-                </button>
-              )}
+            <div className={cn(expanded && "min-w-0 flex-1")}>
+              <SidebarUser expanded={expanded} session={session} logout={logout} />
             </div>
           ) : (
             <span

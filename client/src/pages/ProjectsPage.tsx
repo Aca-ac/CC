@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { IconCheckCircle, IconEdit, IconPlus, IconProjects, IconRefresh, IconTrash } from "../components/icons";
 import {
@@ -17,6 +17,7 @@ import {
   StateMessage,
 } from "../components/ui";
 import { useProjects } from "../hooks/useProjects";
+import { useTasks } from "../hooks/useTasks";
 import { fadeUp, staggerContainer } from "../lib/motion";
 import type { ProjectValue } from "../storage/db";
 
@@ -43,11 +44,34 @@ export function ProjectsPage() {
     refresh,
   } = useProjects();
 
+  const { tasks } = useTasks();
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<(typeof projects)[number] | null>(null);
   const [form, setForm] = useState<ProjectForm>(emptyProjectForm);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // 项目完成度按真实任务计算（已完成 / 全部未归档任务）；无任务时回落到手填进度。
+  const completionByProject = useMemo(() => {
+    const acc = new Map<string, { done: number; total: number }>();
+    for (const task of tasks) {
+      if (task.status === "ARCHIVED") continue;
+      const entry = acc.get(task.projectId) ?? { done: 0, total: 0 };
+      entry.total += 1;
+      if (task.status === "DONE") entry.done += 1;
+      acc.set(task.projectId, entry);
+    }
+    return acc;
+  }, [tasks]);
+
+  const completionFor = (project: (typeof projects)[number]): number => {
+    const entry = completionByProject.get(project.id);
+    if (entry && entry.total > 0) {
+      return Math.round((entry.done / entry.total) * 100);
+    }
+    return project.progress;
+  };
 
   const resetForm = () => {
     setForm(emptyProjectForm);
@@ -106,14 +130,13 @@ export function ProjectsPage() {
   const activeCount = projects.filter((project) => project.status === "ACTIVE").length;
   const averageProgress =
     projects.length > 0
-      ? Math.round(projects.reduce((sum, project) => sum + project.progress, 0) / projects.length)
+      ? Math.round(projects.reduce((sum, project) => sum + completionFor(project), 0) / projects.length)
       : 0;
 
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="项目管理"
-        title="学习项目"
+        title="项目管理"
         description="按项目拆分目标、进度和学习周期。"
         actions={
           <>
@@ -190,7 +213,9 @@ export function ProjectsPage() {
           animate="show"
           className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
         >
-          {projects.map((project) => (
+          {projects.map((project) => {
+            const completion = completionFor(project);
+            return (
             <motion.article key={project.id} variants={fadeUp}>
               <Card className="flex h-full flex-col gap-4">
                 <CardHeader
@@ -204,8 +229,8 @@ export function ProjectsPage() {
                   className="mb-0"
                 />
                 <div className="flex items-center gap-4">
-                  <ProgressRing value={project.progress} size={72} stroke={7}>
-                    <span className="text-sm font-bold text-ink">{project.progress}%</span>
+                  <ProgressRing value={completion} size={72} stroke={7}>
+                    <span className="text-sm font-bold text-ink">{completion}%</span>
                   </ProgressRing>
                   <div className="min-w-0 text-[0.82rem] text-muted">
                     <p>开始：{project.startDate || "未设置"}</p>
@@ -224,7 +249,8 @@ export function ProjectsPage() {
                 </div>
               </Card>
             </motion.article>
-          ))}
+            );
+          })}
         </motion.div>
       )}
 

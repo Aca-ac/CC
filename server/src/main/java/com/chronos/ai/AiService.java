@@ -1,6 +1,7 @@
 package com.chronos.ai;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.chronos.ai.dto.*;
 import com.chronos.ai.provider.AiProvider;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -111,17 +113,21 @@ public class AiService extends ServiceImpl<AiAdviceMapper, AiAdvice> {
             validateProjectOwnership(userId, projectId);
         }
 
-        // 获取 AI 提供商
-        AiProvider provider = providerFactory.getDefaultProvider(userId);
+        // 获取 AI 提供商：拆解走更强的 pro 模型
+        AiProvider provider = providerFactory.getBreakdownProvider(userId);
 
         // 构建请求
-        String systemPrompt = "你是一个专业的项目规划助手。请根据用户的学习目标，按周分解为可执行的任务阶段。"
-                + "你必须以严格的 JSON 格式返回，格式为："
+        String systemPrompt = "你是一个专业的学习规划助手。请把用户的学习目标拆解为按周推进的任务计划，要求：\n"
+                + "1. 阶段数量与计划周数匹配，循序渐进、由浅入深；\n"
+                + "2. 每个阶段任务量适中（通常 2-4 个），同一阶段的任务分别安排在该阶段对应的不同时间，避免全部堆在同一天；\n"
+                + "3. 每个任务给出合理的预计时长（15-180 分钟之间的整十数），以及与重要性匹配的优先级；\n"
+                + "4. 任务标题具体可执行，描述简洁说明做什么、达到什么标准。\n"
+                + "你必须仅返回严格的 JSON，不要包含解释文字，格式为："
                 + "{\"goal\":\"目标\",\"weeks\":周数,\"stages\":[{\"title\":\"阶段名\",\"tasks\":[{\"title\":\"任务\",\"description\":\"描述\",\"estimatedMinutes\":分钟,\"priority\":\"HIGH|MEDIUM|LOW\"}]}]}";
-        String userMessage = "请将以下学习目标拆解为 " + weeks + " 周的计划：" + goal;
+        String userMessage = "请将以下学习目标拆解为 " + weeks + " 周、循序渐进且时间分散的计划：" + goal;
 
         ChatCompletionRequest request = new ChatCompletionRequest(
-                systemPrompt, userMessage, 0.7, 2048, true);
+                systemPrompt, userMessage, 0.7, 2048, true, providerFactory.getBreakdownReasoning());
         var response = provider.chatCompletion(request);
 
         // 保存 AiAdvice 草稿
@@ -185,11 +191,31 @@ public class AiService extends ServiceImpl<AiAdviceMapper, AiAdvice> {
     public WeeklyAdviceResponse generateWeeklyAdvice(String projectId) {
         String userId = String.valueOf(StpUtil.getLoginId());
 
+        // 每天只生成一次：命中当天已生成的建议则直接返回缓存，避免每次进入看板都重复调用浪费 token。
+        AiAdvice cached = this.getOne(
+                new LambdaQueryWrapper<AiAdvice>()
+                        .eq(AiAdvice::getUserId, userId)
+                        .eq(AiAdvice::getType, "WEEKLY_ADVICE")
+                        .orderByDesc(AiAdvice::getGeneratedAt)
+                        .last("LIMIT 1"),
+                false
+        );
+        if (cached != null && cached.getGeneratedAt() != null
+                && cached.getGeneratedAt().toLocalDate().equals(LocalDate.now())) {
+            return new WeeklyAdviceResponse(
+                    cached.getId(),
+                    cached.getTitle(),
+                    cached.getContent(),
+                    cached.getType(),
+                    cached.getGeneratedAt()
+            );
+        }
+
         // 获取周统计
         WeeklyStatsResponse stats = statsService.getWeeklyStats(null);
 
-        // 获取 AI 提供商
-        AiProvider provider = providerFactory.getDefaultProvider(userId);
+        // 获取 AI 提供商：每周建议走更快更省的 flash 模型
+        AiProvider provider = providerFactory.getAdviceProvider(userId);
 
         // 构建请求
         String systemPrompt = "你是一个经验丰富的学习教练。请根据用户的一周学习统计数据，"

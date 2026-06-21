@@ -66,11 +66,25 @@ function addDaysISO(days: number): string {
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
 }
 
-/** 把阶段在计划周期内均匀铺排，得到该阶段的默认截止日期。 */
-function stageDueDate(stageIndex: number, stageCount: number, weeks: number): string {
+/**
+ * 计算单个任务的默认截止日期：先把每个阶段映射到计划周期内的一段时间窗，
+ * 再把该阶段内的任务分散铺排在窗口里——避免所有任务挤在同一天（日期堆积）。
+ */
+function taskDueDate(
+  stageIndex: number,
+  stageCount: number,
+  taskIndex: number,
+  tasksInStage: number,
+  weeks: number,
+): string {
   const totalDays = Math.max(1, weeks) * 7;
-  const count = Math.max(1, stageCount);
-  return addDaysISO(Math.round(((stageIndex + 1) / count) * totalDays));
+  const stages = Math.max(1, stageCount);
+  const windowStart = Math.round((stageIndex / stages) * totalDays);
+  const windowEnd = Math.round(((stageIndex + 1) / stages) * totalDays);
+  const span = Math.max(1, windowEnd - windowStart);
+  const tasks = Math.max(1, tasksInStage);
+  const offsetInWindow = Math.round(((taskIndex + 1) / tasks) * span);
+  return addDaysISO(Math.max(1, windowStart + offsetInWindow));
 }
 
 function toDrafts(tree: BreakdownTree): DraftTask[] {
@@ -84,7 +98,7 @@ function toDrafts(tree: BreakdownTree): DraftTask[] {
       description: task.description,
       estimatedMinutes: Math.max(1, task.estimatedMinutes || 30),
       priority: normalizePriority(task.priority),
-      dueDate: stageDueDate(stageIndex, stageCount, tree.weeks),
+      dueDate: taskDueDate(stageIndex, stageCount, taskIndex, stage.tasks.length, tree.weeks),
     })),
   );
 }
@@ -97,7 +111,8 @@ function toCommitNode(draft: DraftTask): CommitTaskNode {
     estimatedMinutes: Math.max(1, draft.estimatedMinutes),
     priority: draft.priority,
     subtasks: [],
-    dueTime: draft.dueDate ? `${draft.dueDate}T23:59:00` : null,
+    // 截止时间默认设为当天 20:00（更贴近真实习惯），而非 23:59。
+    dueTime: draft.dueDate ? `${draft.dueDate}T20:00:00` : null,
   };
 }
 
@@ -194,7 +209,6 @@ export function AiBreakdownPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="智能规划"
         title="AI 拆解工作台"
         description="把学习目标拆成分阶段、可编辑的任务清单，确认后加入项目。"
         actions={
@@ -230,7 +244,7 @@ export function AiBreakdownPage() {
                   onChange={(e) => setWeeks(Number(e.target.value))}
                 />
               </Field>
-              <Field label="目标项目" hint="生成的任务会创建到这个项目下。">
+              <Field label="目标项目">
                 <Select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
                   <option value="">未选择</option>
                   {projects.map((project) => (
