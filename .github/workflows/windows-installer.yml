@@ -92,12 +92,18 @@ jobs:
             -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$target'"
 
-          # 上传 electron-updater 自托管源所需文件：安装包 + blockmap + latest.yml
+          # 先传二进制（安装包 + blockmap），最后才传 latest.yml，保证 feed 只在
+          # 对应版本安装包完整可下载后才「翻新」，避免客户端检测到新版本却下载 404/卡住。
+          scp -i "$key" -P "$DEPLOY_PORT" \
+            -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
+            client/release/Chronos-Setup-*.exe \
+            client/release/Chronos-Setup-*.exe.blockmap \
+            "$DEPLOY_USER@$DEPLOY_HOST:$target/"
+
+          # latest.yml 单独最后上传，作为发布生效的「开关」。
           scp -i "$key" -P "$DEPLOY_PORT" \
             -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
             client/release/latest.yml \
-            client/release/Chronos-Setup-*.exe \
-            client/release/Chronos-Setup-*.exe.blockmap \
             "$DEPLOY_USER@$DEPLOY_HOST:$target/"
 
           rm -f "$key"

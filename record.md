@@ -184,3 +184,16 @@
 - 改动目的：按用户本轮 8 项要求修复计时器交互、AI 拆解解析鲁棒性、日历筛选与配色、侧栏精简与动效、删除持久化、统计数字视觉。
 - 验证结果：前端 `tsc -p tsconfig.app.json` 与 `vite build` 通过（`tsc -p electron/tsconfig.json` 因本地未装 electron-updater 报错，属既有环境缺口、与本轮无关）；`npx vitest run` 全绿（25 文件 / 68 测试，含 `useTimer.test.ts` 6 项）；后端 `mvnw test` BUILD SUCCESS（含上轮偶发的 `MySqlSaTokenDaoTests` 本次亦通过）。
 - 判断与待办：计时器暂停为本地态（重开应用按服务端 startTime 续算，不持久化暂停区间）；AI 拆解解析鲁棒性已加固，仍依赖模型基本遵循 JSON 指令；删除复活修复同时覆盖项目与任务。
+
+## 2026-06-21 桌面自动更新可靠性（差量优先 + 整包兜底 + 更新动画）
+
+- 分支 `fix/desktop-update-reliability`，bump 客户端到 **2.0.3**。
+- 背景：用户反馈桌面端「很多次检查不到新版本，下载后卡在 0% 无响应」。排查：服务端 feed 稳定（latest.yml=2.0.2、安装包 size/sha512 一致、blockmap 齐全、单/多 range 均 206、multipart/byteranges 正常），即差量下载服务端完全可用；卡 0% 多为代理（用户 198.18.x Clash 出口）无法正确处理 multipart/byteranges 流。检测时断时续主要来自发布上传窗口（旧顺序先传 latest.yml 后传 106MB 安装包，期间 feed 已指向尚未上传完的包）。
+- 改动文件：
+  - `client/electron/main.ts`：保留差量下载为默认（省带宽），新增「看门狗」——`downloadUpdate` 后 25s 内若零进度，取消差量（`cancellationToken.cancel()`）、置 `disableDifferentialDownload=true` 重新整包下载兜底；每次检查恢复差量优先并记录 `pendingCheck` 以持有 cancellationToken。
+  - `client/src/pages/SettingsPage.tsx`：更新卡片动画打磨——下载态改为渐变进度条（>0% 平滑增长、0%/准备态用来回扫光的不确定进度条，避免「卡住」错觉），各状态用 `AnimatePresence` 切换并配动效图标（检查中旋转、发现新版本脉冲、完成弹性对号、错误告警）。
+  - `.github/workflows/windows-installer.yml`：发布上传改为「先传安装包 + blockmap，最后单独传 latest.yml」，保证 feed 只在二进制完整可下载后才生效，消除「检测到新版本却下载 404/卡住」的窗口。
+  - `client/package.json`：2.0.2 → 2.0.3。
+- 改动目的：在保留差量下载（减轻服务器压力）的前提下，根治下载卡 0%（代理不兼容 multipart 时整包兜底），并消除发布窗口导致的检测/下载不稳定；同时打磨更新交互动画。
+- 验证结果：app `tsc -p tsconfig.app.json` 通过；`npx vitest run` 见提交说明（main.ts 属 electron，本地无 electron-updater 不参与 app typecheck，CI `npm ci` 覆盖）。
+- 判断与待办：看门狗回退仅对「装有此版本(≥2.0.3)的客户端发起的下载」生效——当前卡住的旧版本需手动安装一次 2.0.3 安装包打破循环；之后差量优先 + 整包兜底自动生效。
