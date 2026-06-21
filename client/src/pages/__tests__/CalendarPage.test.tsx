@@ -40,7 +40,7 @@ describe("CalendarPage", () => {
     renderCalendar();
 
     await waitFor(() => {
-      expect(screen.getByText("日历计划")).toBeDefined();
+      expect(screen.getByText("时间安排")).toBeDefined();
     });
 
     expect(screen.getByText("周视图")).toBeDefined();
@@ -53,7 +53,7 @@ describe("CalendarPage", () => {
     renderCalendar();
 
     await waitFor(() => {
-      expect(screen.getByText("日历计划")).toBeDefined();
+      expect(screen.getByText("时间安排")).toBeDefined();
     });
 
     fireEvent.click(screen.getByRole("button", { name: /月视图/ }));

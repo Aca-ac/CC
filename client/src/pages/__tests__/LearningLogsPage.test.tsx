@@ -22,7 +22,7 @@ describe("LearningLogsPage", () => {
     renderLearningLogs();
 
     await waitFor(() => {
-      expect(screen.getByText("学习记录")).toBeDefined();
+      expect(screen.getByText("记录与计时")).toBeDefined();
     });
 
     fireEvent.click(screen.getAllByText("手动录入")[0]);

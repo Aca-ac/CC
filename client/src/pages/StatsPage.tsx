@@ -79,7 +79,7 @@ export function StatsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="学习统计"
+        title="数据复盘"
         description="追踪本周完成数、学习时长和项目投入分布。"
         actions={
           <>

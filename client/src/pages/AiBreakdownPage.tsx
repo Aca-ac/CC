@@ -209,8 +209,8 @@ export function AiBreakdownPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="AI 拆解工作台"
-        description="把学习目标拆成分阶段、可编辑的任务清单，确认后加入项目。"
+        title="智能规划"
+        description="把目标拆成分阶段、可编辑的任务清单，确认后加入项目。"
         actions={
           drafts.length > 0 ? (
             <Button variant="secondary" size="sm" onClick={handleReject}>

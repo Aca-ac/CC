@@ -49,7 +49,7 @@ describe("AiBreakdownPage", () => {
     renderAiBreakdown();
 
     await waitFor(() => {
-      expect(screen.getByText("AI 拆解工作台")).toBeDefined();
+      expect(screen.getByText("智能规划")).toBeDefined();
     });
 
     fireEvent.change(screen.getByLabelText("目标描述"), { target: { value: "掌握 React" } });
