@@ -168,3 +168,19 @@
 - 改动目的：按用户本轮 9 项要求做深色配色、账号交互、AI 模型分工与省 token、拆解日期合理化、计时器观感、任务排序与完成反馈、统计正确性、标题去冗余等打磨。
 - 验证结果：前端 `npm run build --workspace client` 通过；`cd client && npx vitest run` 全绿（25 文件 / 68 测试）；后端 `.\server\mvnw.cmd test` 68 测试中仅 `MySqlSaTokenDaoTests.treatsExpiredTokenAsMissing` 偶发失败（H2 MySQL 模式 TIMESTAMP 对 timeout=0 的秒级四舍五入边界，单独重跑 2/2 通过），与本轮改动无关。
 - 判断与待办：模型名（deepseek-v4-pro/flash）与 (high) 推理强度为可配置项，无 Key 时仍回落 Mock；每周建议改为后端当天缓存（前端仍只在进入看板时请求）；任务「AI 拆解顺序」未在后端持久化 orderIndex，靠递增的截止日期体现先后。
+
+## 2026-06-21 收尾阶段 8（计时器暂停/AI解析/日历筛选/侧栏/删除/宋体 8 项修复）
+
+- 新分支 `fix/ui-batch-8`（基于 origin/main 的已发布 2.0.1 代码），随下个版本一并发布。
+- 改动文件：
+  - 专注计时器暂停 + 动画优化（#1）：`client/src/hooks/useTimer.ts` 新增 `paused` 状态与 `pauseTimer/resumeTimer`（用 `baseSecondsRef` 累计已计秒数，可暂停恢复，不影响服务端恢复逻辑）；`client/src/components/icons/index.tsx` 新增 `IconPause`/`IconPlay`；`LearningLogsPage` 活跃计时改为运行时缓慢旋转渐变弧 + 呼吸脉冲，暂停时静止收敛并显示「已暂停」，新增「暂停/继续」按钮。
+  - AI 拆解全面修复（#2）：`AiService` 拆解 prompt 重写（阶段数匹配周数、动词开头、时长分布、禁止 Markdown 代码块、仅输出合法 JSON），`max_tokens` 2048→4096 避免截断；新增 `extractJsonObject`（剥离 ``` 围栏、截取首个`{`到末个`}`）并在解析前调用；解析失败/无 stages 时降级为可读提示而非把原始 JSON 塞进任务标题。
+  - 日历按项目筛选 + 不筛选选项（#3）：`CalendarPage` 新增 `filterProjectId` 与「全部项目」下拉，`visibleTasks` 按项目过滤后再排周/月格；原「选择项目…」（实为导入目标）改名「导入到…」消除歧义。
+  - 去掉侧栏顶部「C」图标（#4）：`AppLayout` 移除渐变「C」方块，仅展开/抽屉态展示「Chronos」文字标识，窄栏顶部留白。
+  - 项目删除后刷新复活修复（#5）：`useProjects.refresh`/`useTasks.refresh` 在用服务端列表覆盖本地前，跳过 outbox 中仍待同步的 DELETE 项（按 entityId 过滤），避免被服务端「复活」。
+  - 日历任务卡按优先级着色（#6）：`CalendarPage` 新增 `priorityCardStyle`（左侧色条 + 同色淡底），周/月视图任务卡均按 LOW/MEDIUM/HIGH/URGENT 着色。
+  - 侧栏图标动画（#7）：`AppLayout` 导航图标包 `motion.span`，hover 放大微旋、点击回弹，选中时弹性脉冲。
+  - 看板小卡片留白 + 宋体数字（#8）：`StatCard` 改为 `justify-between`（图标+标签在左、大号宋体数字靠右填满留白）；新增 `--font-serif`（宋体系）；日历/记录页指标卡数字统一 `font-serif tabular-nums`。
+- 改动目的：按用户本轮 8 项要求修复计时器交互、AI 拆解解析鲁棒性、日历筛选与配色、侧栏精简与动效、删除持久化、统计数字视觉。
+- 验证结果：前端 `tsc -p tsconfig.app.json` 与 `vite build` 通过（`tsc -p electron/tsconfig.json` 因本地未装 electron-updater 报错，属既有环境缺口、与本轮无关）；`npx vitest run` 全绿（25 文件 / 68 测试，含 `useTimer.test.ts` 6 项）；后端 `mvnw test` BUILD SUCCESS（含上轮偶发的 `MySqlSaTokenDaoTests` 本次亦通过）。
+- 判断与待办：计时器暂停为本地态（重开应用按服务端 startTime 续算，不持久化暂停区间）；AI 拆解解析鲁棒性已加固，仍依赖模型基本遵循 JSON 指令；删除复活修复同时覆盖项目与任务。

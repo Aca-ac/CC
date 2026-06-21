@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { IconCalendar, IconCheckCircle, IconChevronRight, IconClock, IconTasks, IconUpload } from "../components/icons";
@@ -96,6 +96,15 @@ const PRIORITY_BAR_VAR: Record<Task["priority"], string> = {
   URGENT: "var(--danger)",
 };
 
+// 任务卡片按优先级着色：左侧色条 + 同色淡底，让不同优先级一眼可辨。
+function priorityCardStyle(priority: Task["priority"]): CSSProperties {
+  const color = PRIORITY_BAR_VAR[priority];
+  return {
+    borderLeftColor: color,
+    background: `color-mix(in srgb, ${color} 8%, var(--panel))`,
+  };
+}
+
 function tasksForDate(tasks: Task[], currentKey: string): Task[] {
   return tasks
     .filter((task) => task.dueTime?.slice(0, 10) === currentKey)
@@ -107,6 +116,7 @@ export function CalendarPage() {
   const { projects } = useProjects();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<CalendarView>("week");
+  const [filterProjectId, setFilterProjectId] = useState("");
   const [importProjectId, setImportProjectId] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
   const [importNotice, setImportNotice] = useState<string | null>(null);
@@ -130,6 +140,12 @@ export function CalendarPage() {
       view === "week" ? addDays(d, 7) : new Date(d.getFullYear(), d.getMonth() + 1, 1)
     );
 
+  // 按项目筛选日历任务；filterProjectId 为空表示「全部项目」（不筛选）。
+  const visibleTasks = useMemo(
+    () => (filterProjectId ? tasks.filter((task) => task.projectId === filterProjectId) : tasks),
+    [tasks, filterProjectId]
+  );
+
   const weekCells = useMemo<DayCell[]>(() => {
     const monday = getMonday(anchorDate);
 
@@ -143,10 +159,10 @@ export function CalendarPage() {
         dateStr: currentKey,
         isToday: currentKey === todayKey,
         isCurrentMonth: date.getMonth() === anchorDate.getMonth(),
-        tasks: tasksForDate(tasks, currentKey),
+        tasks: tasksForDate(visibleTasks, currentKey),
       };
     });
-  }, [anchorDate, tasks, todayKey]);
+  }, [anchorDate, visibleTasks, todayKey]);
 
   const monthCells = useMemo<DayCell[]>(() => {
     const monthStart = new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1);
@@ -162,10 +178,10 @@ export function CalendarPage() {
         dateStr: currentKey,
         isToday: currentKey === todayKey,
         isCurrentMonth: date.getMonth() === anchorDate.getMonth(),
-        tasks: tasksForDate(tasks, currentKey),
+        tasks: tasksForDate(visibleTasks, currentKey),
       };
     });
-  }, [anchorDate, tasks, todayKey]);
+  }, [anchorDate, visibleTasks, todayKey]);
 
   // 周视图小时轴范围：默认 8:00–21:00，并自动扩展以容纳所有有时间的任务。
   const hourRange = useMemo(() => {
@@ -284,6 +300,23 @@ export function CalendarPage() {
               </button>
             </div>
 
+            {/* 按项目筛选（默认全部项目 = 不筛选） */}
+            <div className="w-40">
+              <Select
+                aria-label="按项目筛选"
+                value={filterProjectId}
+                onChange={(event) => setFilterProjectId(event.target.value)}
+                className="h-9 py-0 text-[0.82rem]"
+              >
+                <option value="">全部项目</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
             {/* 导入 iCal 到指定项目 */}
             <div className="w-40">
               <Select
@@ -292,7 +325,7 @@ export function CalendarPage() {
                 onChange={(event) => setImportProjectId(event.target.value)}
                 className="h-9 py-0 text-[0.82rem]"
               >
-                <option value="">选择项目…</option>
+                <option value="">导入到…</option>
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.name}
@@ -327,7 +360,7 @@ export function CalendarPage() {
             <IconTasks size={19} />
           </span>
           <div>
-            <p className="text-xl font-bold text-ink">{visibleTaskCount}</p>
+            <p className="font-serif text-2xl font-bold tabular-nums text-ink">{visibleTaskCount}</p>
             <p className="text-[0.78rem] text-muted">{view === "week" ? "本周到期" : "本月到期"}</p>
           </div>
         </Card>
@@ -336,7 +369,7 @@ export function CalendarPage() {
             <IconCheckCircle size={19} />
           </span>
           <div>
-            <p className="text-xl font-bold text-ink">{completedVisible}</p>
+            <p className="font-serif text-2xl font-bold tabular-nums text-ink">{completedVisible}</p>
             <p className="text-[0.78rem] text-muted">已完成</p>
           </div>
         </Card>
@@ -345,7 +378,7 @@ export function CalendarPage() {
             <IconClock size={19} />
           </span>
           <div>
-            <p className="text-xl font-bold text-ink">{busyDay.tasks.length}</p>
+            <p className="font-serif text-2xl font-bold tabular-nums text-ink">{busyDay.tasks.length}</p>
             <p className="text-[0.78rem] text-muted">{busyDay.dateLabel} 最密集</p>
           </div>
         </Card>
@@ -426,8 +459,8 @@ export function CalendarPage() {
                             key={task.id}
                             to="/tasks"
                             title={`${formatTime(task.dueTime!)} · ${task.title}`}
-                            className="block rounded-md border border-line/70 border-l-[3px] bg-panel px-2 py-1 shadow-soft transition-[transform,border-color] hover:-translate-y-px hover:border-brand/40"
-                            style={{ borderLeftColor: PRIORITY_BAR_VAR[task.priority] }}
+                            className="block rounded-md border border-line/70 border-l-[3px] px-2 py-1 shadow-soft transition-[transform,border-color] hover:-translate-y-px hover:border-brand/40"
+                            style={priorityCardStyle(task.priority)}
                           >
                             <p className="truncate text-[0.74rem] font-medium text-ink">{task.title}</p>
                             <p className="text-[0.66rem] tabular-nums text-muted">{formatTime(task.dueTime!)}</p>
@@ -477,7 +510,8 @@ export function CalendarPage() {
                         <Link
                           key={task.id}
                           to="/tasks"
-                          className="block rounded-md border border-line bg-panel p-2 transition-[border-color,transform] hover:-translate-y-px hover:border-brand"
+                          className="block rounded-md border border-line border-l-[3px] p-2 transition-[border-color,transform] hover:-translate-y-px hover:border-brand"
+                          style={priorityCardStyle(task.priority)}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <p className="line-clamp-2 text-[0.82rem] font-medium text-ink">{task.title}</p>

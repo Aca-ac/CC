@@ -117,17 +117,19 @@ public class AiService extends ServiceImpl<AiAdviceMapper, AiAdvice> {
         AiProvider provider = providerFactory.getBreakdownProvider(userId);
 
         // 构建请求
-        String systemPrompt = "你是一个专业的学习规划助手。请把用户的学习目标拆解为按周推进的任务计划，要求：\n"
-                + "1. 阶段数量与计划周数匹配，循序渐进、由浅入深；\n"
-                + "2. 每个阶段任务量适中（通常 2-4 个），同一阶段的任务分别安排在该阶段对应的不同时间，避免全部堆在同一天；\n"
-                + "3. 每个任务给出合理的预计时长（15-180 分钟之间的整十数），以及与重要性匹配的优先级；\n"
-                + "4. 任务标题具体可执行，描述简洁说明做什么、达到什么标准。\n"
-                + "你必须仅返回严格的 JSON，不要包含解释文字，格式为："
+        String systemPrompt = "你是一名专业的学习规划助手。请把用户的学习目标拆解为按周推进、循序渐进的任务计划，要求：\n"
+                + "1. stages（阶段）数量与计划周数大致匹配，由浅入深、前后衔接，不要把所有内容堆在一个阶段；\n"
+                + "2. 每个阶段包含 2-4 个任务；任务标题具体可执行，用动词开头（如「完成…」「练习…」「整理…」），避免空泛口号；\n"
+                + "3. description 用一句话说明做什么、达到什么标准，不要重复标题；\n"
+                + "4. estimatedMinutes 取 15-180 之间的整十数，贴合任务真实工作量，不要全部填同一个值；\n"
+                + "5. priority 仅取 HIGH / MEDIUM / LOW，核心/紧迫任务用 HIGH，巩固/拓展类用 LOW；\n"
+                + "6. 只输出 JSON 对象本身：禁止使用 Markdown 代码块、反引号或任何额外解释文字，确保是可直接解析的合法 JSON。\n"
+                + "输出格式严格为："
                 + "{\"goal\":\"目标\",\"weeks\":周数,\"stages\":[{\"title\":\"阶段名\",\"tasks\":[{\"title\":\"任务\",\"description\":\"描述\",\"estimatedMinutes\":分钟,\"priority\":\"HIGH|MEDIUM|LOW\"}]}]}";
-        String userMessage = "请将以下学习目标拆解为 " + weeks + " 周、循序渐进且时间分散的计划：" + goal;
+        String userMessage = "请将以下学习目标拆解为 " + weeks + " 周、循序渐进的可执行计划，并仅返回 JSON：" + goal;
 
         ChatCompletionRequest request = new ChatCompletionRequest(
-                systemPrompt, userMessage, 0.7, 2048, true, providerFactory.getBreakdownReasoning());
+                systemPrompt, userMessage, 0.7, 4096, true, providerFactory.getBreakdownReasoning());
         var response = provider.chatCompletion(request);
 
         // 保存 AiAdvice 草稿
@@ -306,8 +308,9 @@ public class AiService extends ServiceImpl<AiAdviceMapper, AiAdvice> {
      * 解析失败时返回带有原始内容的简单结构。
      */
     private BreakdownTreeResponse parseBreakdownResponse(String draftId, String goal, int weeks, String content) {
+        String json = extractJsonObject(content);
         try {
-            JsonNode root = objectMapper.readTree(content);
+            JsonNode root = objectMapper.readTree(json);
             List<BreakdownTreeResponse.StageNode> stages = new ArrayList<>();
 
             JsonNode stagesNode = root.path("stages");
@@ -331,16 +334,53 @@ public class AiService extends ServiceImpl<AiAdviceMapper, AiAdvice> {
                 }
             }
 
-            return new BreakdownTreeResponse(draftId, goal, weeks, stages);
+            if (!stages.isEmpty()) {
+                return new BreakdownTreeResponse(draftId, goal, weeks, stages);
+            }
+            logger.warn("AI 返回的 JSON 未包含有效的 stages: {}", json);
         } catch (Exception e) {
-            logger.warn("解析 AI 返回的 JSON 失败，返回原始内容: {}", e.getMessage());
-            // 降级：返回包含原始文本的简单结构
-            List<BreakdownTreeResponse.StageNode> fallbackStages = List.of(
-                    new BreakdownTreeResponse.StageNode("AI 建议", List.of(
-                            new BreakdownTreeResponse.TaskDraft(content, "", 30, "MEDIUM")
-                    ))
-            );
-            return new BreakdownTreeResponse(draftId, goal, weeks, fallbackStages);
+            logger.warn("解析 AI 返回的 JSON 失败: {}", e.getMessage());
         }
+
+        // 降级：给出可读提示，而不是把原始 JSON 塞进任务标题。
+        String hint = content == null ? "" : content.strip();
+        if (hint.length() > 200) {
+            hint = hint.substring(0, 200) + "…";
+        }
+        List<BreakdownTreeResponse.StageNode> fallbackStages = List.of(
+                new BreakdownTreeResponse.StageNode("AI 建议", List.of(
+                        new BreakdownTreeResponse.TaskDraft(
+                                "未能自动解析为任务，请重试或精简目标描述", hint, 30, "MEDIUM")
+                ))
+        );
+        return new BreakdownTreeResponse(draftId, goal, weeks, fallbackStages);
+    }
+
+    /**
+     * 从模型返回的文本中提取 JSON 对象：去除 Markdown 代码块围栏，
+     * 并截取首个 '{' 到最后一个 '}' 之间的内容，剔除前后多余文字。
+     */
+    private static String extractJsonObject(String content) {
+        if (content == null) {
+            return "";
+        }
+        String s = content.strip();
+        if (s.startsWith("```")) {
+            int firstNewline = s.indexOf('\n');
+            if (firstNewline >= 0) {
+                s = s.substring(firstNewline + 1);
+            }
+            int closingFence = s.lastIndexOf("```");
+            if (closingFence >= 0) {
+                s = s.substring(0, closingFence);
+            }
+            s = s.strip();
+        }
+        int start = s.indexOf('{');
+        int end = s.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return s.substring(start, end + 1);
+        }
+        return s;
     }
 }

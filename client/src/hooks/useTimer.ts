@@ -9,6 +9,8 @@ import type { FocusSessionValue } from "../storage/db";
 export interface TimerState {
   active: boolean;
   elapsedSeconds: number;
+  /** true when the active timer is temporarily paused（计时冻结，不计入新时长） */
+  paused: boolean;
   projectId?: string;
   taskId?: string;
   sessionId?: string;
@@ -21,6 +23,8 @@ export interface TimerState {
 export interface UseTimerReturn {
   timer: TimerState;
   startTimer: (projectId: string, taskId?: string) => Promise<void>;
+  pauseTimer: () => void;
+  resumeTimer: () => void;
   stopTimer: () => Promise<void>;
   discardTimer: () => Promise<void>;
   restoreTimer: () => Promise<void>;
@@ -32,11 +36,15 @@ export function useTimer(): UseTimerReturn {
   const [timer, setTimer] = useState<TimerState>({
     active: false,
     elapsedSeconds: 0,
+    paused: false,
     restoring: false,
     error: null,
   });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 当前计时段的起点（毫秒）。
   const startTimeRef = useRef<number>(0);
+  // 暂停前已累计的秒数；恢复后从这里继续累加，实现可暂停的计时。
+  const baseSecondsRef = useRef<number>(0);
 
   const clearTick = useCallback(() => {
     if (intervalRef.current) {
@@ -47,7 +55,7 @@ export function useTimer(): UseTimerReturn {
 
   const tick = useCallback(() => {
     const now = Date.now();
-    const elapsed = Math.floor((now - startTimeRef.current) / 1000);
+    const elapsed = baseSecondsRef.current + Math.floor((now - startTimeRef.current) / 1000);
     setTimer((prev) => ({ ...prev, elapsedSeconds: elapsed }));
   }, []);
 
@@ -120,9 +128,11 @@ export function useTimer(): UseTimerReturn {
       }
 
       startTimeRef.current = now;
+      baseSecondsRef.current = 0;
       setTimer({
         active: true,
         elapsedSeconds: 0,
+        paused: false,
         projectId,
         taskId,
         sessionId: session.id,
@@ -133,6 +143,26 @@ export function useTimer(): UseTimerReturn {
     },
     [accountId, enqueue, startTick]
   );
+
+  const pauseTimer = useCallback(() => {
+    setTimer((prev) => {
+      if (!prev.active || prev.paused) return prev;
+      // 冻结已累计秒数，停止计时器（不再累加运行时间）。
+      const elapsed = baseSecondsRef.current + Math.floor((Date.now() - startTimeRef.current) / 1000);
+      baseSecondsRef.current = elapsed;
+      clearTick();
+      return { ...prev, paused: true, elapsedSeconds: elapsed };
+    });
+  }, [clearTick]);
+
+  const resumeTimer = useCallback(() => {
+    setTimer((prev) => {
+      if (!prev.active || !prev.paused) return prev;
+      startTimeRef.current = Date.now();
+      startTick();
+      return { ...prev, paused: false };
+    });
+  }, [startTick]);
 
   const stopTimer = useCallback(async () => {
     if (!timer.active || !timer.sessionId) return;
@@ -159,7 +189,8 @@ export function useTimer(): UseTimerReturn {
     }
 
     clearTick();
-    setTimer({ active: false, elapsedSeconds: 0, restoring: false, error: null });
+    baseSecondsRef.current = 0;
+    setTimer({ active: false, elapsedSeconds: 0, paused: false, restoring: false, error: null });
   }, [accountId, timer.active, timer.sessionId, timer.elapsedSeconds, enqueue, clearTick]);
 
   const discardTimer = useCallback(async () => {
@@ -180,7 +211,8 @@ export function useTimer(): UseTimerReturn {
     }
 
     clearTick();
-    setTimer({ active: false, elapsedSeconds: 0, restoring: false, error: null });
+    baseSecondsRef.current = 0;
+    setTimer({ active: false, elapsedSeconds: 0, paused: false, restoring: false, error: null });
   }, [accountId, timer.active, timer.sessionId, enqueue, clearTick]);
 
   const restoreTimer = useCallback(async () => {
@@ -219,9 +251,11 @@ export function useTimer(): UseTimerReturn {
         });
 
         startTimeRef.current = serverStart;
+        baseSecondsRef.current = 0;
         setTimer({
           active: true,
           elapsedSeconds: elapsed,
+          paused: false,
           projectId: serverActive.projectId,
           taskId: serverActive.taskId,
           sessionId: serverActive.id,
@@ -251,9 +285,11 @@ export function useTimer(): UseTimerReturn {
 
     const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
     startTimeRef.current = state.startTime;
+    baseSecondsRef.current = 0;
     setTimer({
       active: true,
       elapsedSeconds: elapsed,
+      paused: false,
       projectId: state.projectId,
       taskId: state.taskId,
       sessionId: state.sessionId,
@@ -276,6 +312,8 @@ export function useTimer(): UseTimerReturn {
   return {
     timer,
     startTimer,
+    pauseTimer,
+    resumeTimer,
     stopTimer,
     discardTimer,
     restoreTimer,

@@ -138,26 +138,15 @@ function SidebarContent({
 
   return (
     <div className={cn("flex h-full flex-col p-3.5", expanded ? "gap-5" : "gap-4")}>
-      {/* Brand */}
-      <div className={cn("flex items-center pt-1", expanded ? "gap-2.5 px-2" : "justify-center px-0")}>
-        <span
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-base font-bold text-[var(--on-accent)] shadow-[0_3px_12px_var(--accent-shadow-strong)]"
-          style={{ background: "linear-gradient(135deg, var(--grad-from), var(--grad-to))" }}
-          aria-label="Chronos 应用图标"
-        >
-          C
-        </span>
-        <motion.div
-          initial={false}
-          animate={{ opacity: expanded ? 1 : 0, width: expanded ? 156 : 0 }}
-          transition={labelTransition}
-          className="min-w-0 overflow-hidden leading-tight"
-          aria-hidden={!expanded}
-        >
-          <strong className="block text-[1.02rem] font-semibold text-ink">Chronos</strong>
-          <span className="block text-[0.74rem] text-muted">学习任务管理</span>
-        </motion.div>
-      </div>
+      {/* Brand — 仅展开/抽屉态展示文字标识，窄栏顶部留白（已去掉「C」图标） */}
+      {expanded && (
+        <div className="flex items-center px-2 pt-1">
+          <div className="min-w-0 leading-tight">
+            <strong className="block text-[1.02rem] font-semibold text-ink">Chronos</strong>
+            <span className="block text-[0.74rem] text-muted">学习任务管理</span>
+          </div>
+        </div>
+      )}
 
       {/* Nav */}
       <nav className="flex flex-col gap-1" aria-label="主导航">
@@ -197,7 +186,19 @@ function SidebarContent({
                       isActive ? "text-[var(--on-accent)]" : "text-muted hover:text-ink"
                     )}
                   >
-                    <Icon size={18} strokeWidth={2.1} />
+                    <motion.span
+                      className="grid shrink-0 place-items-center"
+                      animate={isActive ? { scale: [1, 1.18, 1] } : { scale: 1 }}
+                      transition={
+                        isActive
+                          ? { duration: 0.42, ease: [0.22, 1, 0.36, 1] }
+                          : { type: "spring", stiffness: 420, damping: 24 }
+                      }
+                      whileHover={{ scale: 1.18, rotate: -6 }}
+                      whileTap={{ scale: 0.88 }}
+                    >
+                      <Icon size={18} strokeWidth={2.1} />
+                    </motion.span>
                     {expanded && (
                       <motion.span
                         initial={false}

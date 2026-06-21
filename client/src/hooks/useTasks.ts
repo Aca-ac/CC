@@ -84,7 +84,14 @@ export function useTasks(): UseTasksReturn {
     try {
       if (navigator.onLine && accountId !== "local") {
         const remote = await apiClient.listTasks();
+        // 本地已软删除但尚未同步到服务端的任务：不要被服务端列表「复活」。
+        const pendingDeletes = new Set(
+          (await outboxRepository.findPending(accountId))
+            .filter((m) => m.entityType === "TASK" && m.operation === "DELETE")
+            .map((m) => m.entityId)
+        );
         for (const r of remote) {
+          if (pendingDeletes.has(r.id)) continue;
           const existing = await taskRepository.findById(r.id);
           const value: TaskValue = {
             ...r,

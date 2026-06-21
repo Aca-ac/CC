@@ -38,7 +38,8 @@ describe("AppLayout", () => {
     );
 
     expect(screen.getByLabelText("主导航")).toBeTruthy();
-    expect(screen.getByLabelText("Chronos 应用图标")).toBeTruthy();
+    // 已移除侧栏顶部冗余的「C」品牌图标
+    expect(screen.queryByLabelText("Chronos 应用图标")).toBeNull();
     expect(screen.getAllByText("Chronos").length).toBeGreaterThan(0);
     expect(document.querySelector(".topbar")).toBeNull();
     expect(screen.queryByText("Chronos Scaffold")).toBeNull();

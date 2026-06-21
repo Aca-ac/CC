@@ -181,6 +181,19 @@ export const IconTimer: IconComponent = (p) => (
   </Svg>
 );
 
+export const IconPause: IconComponent = (p) => (
+  <Svg {...p}>
+    <path d="M9 5.2c.1 4.5.1 9.1 0 13.6" />
+    <path d="M15 5.2c.1 4.5.1 9.1 0 13.6" />
+  </Svg>
+);
+
+export const IconPlay: IconComponent = (p) => (
+  <Svg {...p}>
+    <path d="M7.4 5.3c0-.7.7-1.1 1.3-.8 3.2 1.8 6.2 3.8 9.1 6.1.5.4.5 1.2 0 1.6-2.9 2.3-5.9 4.3-9.1 6.1-.6.3-1.3-.1-1.3-.8-.1-4.1-.1-8.2 0-12.2Z" />
+  </Svg>
+);
+
 export const IconLogout: IconComponent = (p) => (
   <Svg {...p}>
     <path d="M13.6 4.4c-2.6-.2-5.2-.2-7.8 0-.7 0-1.3.6-1.3 1.3-.2 4.2-.2 8.4 0 12.6 0 .7.6 1.3 1.3 1.3 2.6.2 5.2.2 7.8 0" />
