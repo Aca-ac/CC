@@ -44,6 +44,18 @@ function normalizeReleaseNotes(releaseNotes: UpdateInfo["releaseNotes"]) {
   return releaseNotes ?? undefined;
 }
 
+// 把 electron-updater 的原始网络错误转成面向用户的友好文案，避免把 HttpError 堆栈抛到界面。
+function friendlyUpdateError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/404|not found/i.test(message)) {
+    return "暂时无法获取更新信息（未找到更新源）。可稍后再试，或前往发布页手动下载。";
+  }
+  if (/ENOTFOUND|EAI_AGAIN|getaddrinfo|ECONNREFUSED|ETIMEDOUT|ECONNRESET|net::|network/i.test(message)) {
+    return "网络不可用，暂时无法检查更新，请稍后再试。";
+  }
+  return "检查更新失败，请稍后再试，或前往发布页手动下载。";
+}
+
 function configureAutoUpdater() {
   if (!isNativeUpdaterSupported()) {
     return false;
@@ -84,7 +96,7 @@ function configureAutoUpdater() {
     });
   });
   autoUpdater.on("error", (error) => {
-    emitUpdateStatus({ state: "error", message: error.message });
+    emitUpdateStatus({ state: "error", message: friendlyUpdateError(error) });
   });
 
   return true;
@@ -96,8 +108,14 @@ async function checkNativeUpdate(): Promise<DesktopUpdateStatus> {
   }
 
   emitUpdateStatus({ state: "checking" });
-  await autoUpdater.checkForUpdates();
-  return { state: "checking" };
+  try {
+    await autoUpdater.checkForUpdates();
+    return { state: "checking" };
+  } catch (error) {
+    const status: DesktopUpdateStatus = { state: "error", message: friendlyUpdateError(error) };
+    emitUpdateStatus(status);
+    return status;
+  }
 }
 
 async function downloadNativeUpdate(): Promise<DesktopUpdateStatus> {
@@ -106,8 +124,14 @@ async function downloadNativeUpdate(): Promise<DesktopUpdateStatus> {
   }
 
   emitUpdateStatus({ state: "downloading", percent: 0 });
-  await autoUpdater.downloadUpdate();
-  return { state: "downloading", percent: 0 };
+  try {
+    await autoUpdater.downloadUpdate();
+    return { state: "downloading", percent: 0 };
+  } catch (error) {
+    const status: DesktopUpdateStatus = { state: "error", message: friendlyUpdateError(error) };
+    emitUpdateStatus(status);
+    return status;
+  }
 }
 
 function installNativeUpdate(): DesktopUpdateStatus {

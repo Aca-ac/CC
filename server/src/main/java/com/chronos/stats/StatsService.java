@@ -161,19 +161,17 @@ public class StatsService {
         List<WeeklyStatsResponse.ProjectStats> projectDistribution = new ArrayList<>();
         if (!projectIds.isEmpty()) {
             for (String pId : projectIds) {
+                // 项目完成度按「全部任务」统计（不限本周窗口），这样「项目进度」反映真实的累计完成占比，
+                // 与项目管理页卡片一致；项目投入时长（projMinutes）仍按本周统计。
                 int projTotal = taskMapper.selectCount(
                         new LambdaQueryWrapper<Task>()
                                 .eq(Task::getProjectId, pId)
-                                .and(w -> w.between(Task::getCreatedAt, weekStartDateTime, weekEndDateTime)
-                                        .or()
-                                        .between(Task::getUpdatedAt, weekStartDateTime, weekEndDateTime))
                 ).intValue();
 
                 int projCompleted = taskMapper.selectCount(
                         new LambdaQueryWrapper<Task>()
                                 .eq(Task::getProjectId, pId)
                                 .eq(Task::getStatus, TaskStatus.DONE)
-                                .between(Task::getUpdatedAt, weekStartDateTime, weekEndDateTime)
                 ).intValue();
 
                 int projFocusMinutes = focusSessionMapper.selectList(

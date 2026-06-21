@@ -181,8 +181,7 @@ export function LearningLogsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="记录与计时"
-        title="学习记录"
+        title="记录与计时"
         description="把手动复盘和专注计时放在同一条时间线里，方便回看投入与难度。"
         actions={
           <>
@@ -251,17 +250,55 @@ export function LearningLogsPage() {
         )}
 
         {!timer.restoring && timer.active ? (
-          <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div>
-              <div className="font-mono text-4xl font-bold tracking-tight text-ink">
-                {formatDuration(timer.elapsedSeconds)}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-[0.82rem] text-muted">
-                <Badge tone="brand">{projectName.get(timer.projectId ?? "") ?? timer.projectId}</Badge>
-                {timer.taskId && <Badge tone="neutral">{taskTitle.get(timer.taskId) ?? timer.taskId}</Badge>}
+          <div className="flex flex-col items-center gap-5 py-3">
+            {/* 专注光环：呼吸式脉冲 + 渐变计时数字 */}
+            <div className="relative grid h-44 w-44 place-items-center">
+              {[0, 1].map((i) => (
+                <motion.span
+                  key={i}
+                  aria-hidden
+                  className="absolute inset-0 rounded-full border-2 border-focus/30"
+                  initial={{ scale: 0.85, opacity: 0.55 }}
+                  animate={{ scale: 1.28, opacity: 0 }}
+                  transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut", delay: i * 1.2 }}
+                />
+              ))}
+              <div
+                className="relative grid h-40 w-40 place-items-center rounded-full border border-focus/30 bg-panel-muted/40 backdrop-blur-sm"
+                style={{
+                  boxShadow: "inset 0 0 28px color-mix(in srgb, var(--focus) 16%, transparent)",
+                }}
+              >
+                <div className="text-center">
+                  <div
+                    className="font-mono text-[2rem] font-bold tabular-nums tracking-tight"
+                    style={{
+                      background: "linear-gradient(135deg, var(--focus), var(--accent))",
+                      WebkitBackgroundClip: "text",
+                      backgroundClip: "text",
+                      color: "transparent",
+                    }}
+                  >
+                    {formatDuration(timer.elapsedSeconds)}
+                  </div>
+                  <div className="mt-1 flex items-center justify-center gap-1.5 text-[0.74rem] font-medium text-focus">
+                    <motion.span
+                      className="inline-block h-1.5 w-1.5 rounded-full bg-focus"
+                      animate={{ opacity: [1, 0.25, 1] }}
+                      transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                    专注中
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
+
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Badge tone="brand">{projectName.get(timer.projectId ?? "") ?? timer.projectId}</Badge>
+              {timer.taskId && <Badge tone="neutral">{taskTitle.get(timer.taskId) ?? timer.taskId}</Badge>}
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-2">
               <Button onClick={stopTimer}>
                 <IconCheckCircle size={15} />
                 停止并保存

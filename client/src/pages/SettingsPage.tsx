@@ -211,8 +211,7 @@ export function SettingsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="偏好设置"
-        title="系统设置"
+        title="偏好设置"
         description="管理外观、账号、AI 服务与应用更新。"
         actions={
           <Badge tone={offline ? "warning" : "success"} dot>

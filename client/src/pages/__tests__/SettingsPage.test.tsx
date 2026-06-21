@@ -23,7 +23,7 @@ describe("SettingsPage", () => {
     renderSettings();
 
     await waitFor(() => {
-      expect(screen.getByText("系统设置")).toBeDefined();
+      expect(screen.getByText("偏好设置")).toBeDefined();
     });
 
     // 精简后的分区

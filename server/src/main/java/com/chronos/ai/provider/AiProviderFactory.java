@@ -18,6 +18,10 @@ public class AiProviderFactory {
     private final String deepseekEndpoint;
     private final String deepseekModel;
     private final String deepseekApiKey;
+    // 服务器内置 AI 的分工：拆解走更强的 pro 模型（高推理），每周建议走更快更省的 flash 模型。
+    private final String breakdownModel;
+    private final String breakdownReasoning;
+    private final String adviceModel;
     private final String mimoEndpoint;
     private final String mimoModel;
     private final String mimoApiKey;
@@ -32,6 +36,9 @@ public class AiProviderFactory {
             @Value("${chronos.ai.providers.deepseek.endpoint:https://api.deepseek.com}") String deepseekEndpoint,
             @Value("${chronos.ai.providers.deepseek.model:deepseek-v4-flash}") String deepseekModel,
             @Value("${chronos.ai.api-key:}") String deepseekApiKey,
+            @Value("${chronos.ai.breakdown-model:deepseek-v4-pro}") String breakdownModel,
+            @Value("${chronos.ai.breakdown-reasoning:high}") String breakdownReasoning,
+            @Value("${chronos.ai.advice-model:deepseek-v4-flash}") String adviceModel,
             @Value("${chronos.ai.providers.mimo.endpoint:https://api.minimaxi.com}") String mimoEndpoint,
             @Value("${chronos.ai.providers.mimo.model:mimo-v2.5-pro}") String mimoModel,
             @Value("${MIMO_API_KEY:}") String mimoApiKey,
@@ -44,6 +51,9 @@ public class AiProviderFactory {
         this.deepseekEndpoint = deepseekEndpoint;
         this.deepseekModel = deepseekModel;
         this.deepseekApiKey = deepseekApiKey;
+        this.breakdownModel = breakdownModel;
+        this.breakdownReasoning = breakdownReasoning;
+        this.adviceModel = adviceModel;
         this.mimoEndpoint = mimoEndpoint;
         this.mimoModel = mimoModel;
         this.mimoApiKey = mimoApiKey;
@@ -80,14 +90,33 @@ public class AiProviderFactory {
         return fallbackEnabled;
     }
 
+    /** AI 拆解使用的提供商：DeepSeek pro 模型（无 Key 时回落 Mock）。 */
+    public AiProvider getBreakdownProvider(String userId) {
+        return createDeepSeekProvider(userId, breakdownModel);
+    }
+
+    /** 每周建议使用的提供商：DeepSeek flash 模型（无 Key 时回落 Mock）。 */
+    public AiProvider getAdviceProvider(String userId) {
+        return createDeepSeekProvider(userId, adviceModel);
+    }
+
+    /** AI 拆解的推理强度（如 "high"），随请求传给支持的模型。 */
+    public String getBreakdownReasoning() {
+        return breakdownReasoning;
+    }
+
     private AiProvider createDeepSeekProvider(String userId) {
+        return createDeepSeekProvider(userId, deepseekModel);
+    }
+
+    private AiProvider createDeepSeekProvider(String userId, String modelFallback) {
         // 优先使用用户 BYOK
         String userKey = aiSettingsService.getDecryptedKey(userId, "DEEPSEEK");
         String key = (userKey != null) ? userKey : deepseekApiKey;
         if (key == null || key.isBlank()) {
             return new MockProvider();
         }
-        return new DeepSeekProvider(deepseekEndpoint, resolveModel(userId, "DEEPSEEK", deepseekModel), key);
+        return new DeepSeekProvider(deepseekEndpoint, resolveModel(userId, "DEEPSEEK", modelFallback), key);
     }
 
     private AiProvider createMiMoProvider(String userId) {

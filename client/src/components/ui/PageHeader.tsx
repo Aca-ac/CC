@@ -19,8 +19,15 @@ export function PageHeader({ eyebrow, title, description, actions, className }: 
             {eyebrow}
           </p>
         )}
-        <h1 className="text-2xl font-bold tracking-tight text-ink">{title}</h1>
-        {description && <p className="mt-1.5 text-[0.9rem] text-muted">{description}</p>}
+        <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-ink">
+          <span
+            className="inline-block h-6 w-[4px] shrink-0 rounded-full"
+            style={{ background: "linear-gradient(180deg, var(--grad-from), var(--grad-to))" }}
+            aria-hidden
+          />
+          {title}
+        </h1>
+        {description && <p className="mt-1.5 pl-[14px] text-[0.9rem] text-muted">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </header>

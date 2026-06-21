@@ -88,6 +88,10 @@ public class DeepSeekProvider implements AiProvider {
         body.put("temperature", request.temperature());
         body.put("max_tokens", request.maxTokens());
 
+        if (request.reasoningEffort() != null && !request.reasoningEffort().isBlank()) {
+            body.put("reasoning_effort", request.reasoningEffort());
+        }
+
         if (request.jsonMode()) {
             body.put("response_format", Map.of("type", "json_object"));
         }

@@ -45,7 +45,7 @@ describe("StatsPage", () => {
     render(<StatsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("学习统计")).toBeDefined();
+      expect(screen.getByText("数据复盘")).toBeDefined();
     });
 
     expect(screen.getByText("本周完成数")).toBeDefined();
@@ -66,6 +66,6 @@ describe("StatsPage", () => {
     // 修复前：stats?.dailyMinutes.reduce 在数组缺失时抛 TypeError，整页白屏
     expect(() => render(<StatsPage />)).not.toThrow();
     // 页面正常挂载（标题可见），而不是崩溃白屏
-    expect(screen.getByText("学习统计")).toBeTruthy();
+    expect(screen.getByText("数据复盘")).toBeTruthy();
   });
 });

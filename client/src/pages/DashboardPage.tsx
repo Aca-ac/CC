@@ -62,7 +62,6 @@ export function DashboardPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="工作台"
         title="今日看板"
         description={dateLabel}
         actions={

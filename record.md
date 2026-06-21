@@ -142,3 +142,29 @@
 - 改动目的：按用户要求把「注销」实现为永久删除账号及全部数据（区别于「退出登录」）；并将本轮全部改动作为 2.0.0 发布。
 - 验证结果：前端 `npm run build --workspace client` 通过；后端 `AuthServiceTests` 通过（1/0/0）。
 - 发布：提交 PR 至 main（用户负责合并 → 触发 CD 部署网页版），推送 `v2.0.0` tag 触发 `windows-installer.yml` 出包并 `gh release create`（含修好命名后的 NSIS 安装包 + latest.yml）。
+
+## 2026-06-20 收尾阶段 6（桌面自托管自动更新 + 友好报错）
+
+- 背景：仓库为私有，GitHub Release 及资产需鉴权，electron-updater 匿名读取 `releases.atom` 得 404，桌面端「检查更新」报原始 HttpError。GitHub 不支持单独公开 Release（可见性跟随仓库）。
+- 改动文件：`client/electron/main.ts`（新增 `friendlyUpdateError`，`checkNativeUpdate`/`downloadNativeUpdate` 包裹 try/catch 并以友好状态返回，`error` 事件用友好文案，避免把网络错误堆栈抛到界面）、`client/package.json`（`build.publish` 由 github 改为 generic 自托管源 `https://vincentt.xyz/chronos/updates/`；版本 2.0.0 → 2.0.1）、`.github/workflows/windows-installer.yml`（构建后新增「Publish update feed to server」步骤：复用现有 DEPLOY_* SSH 密钥，scp `latest.yml + Chronos-Setup-*.exe + .blockmap` 到服务器 `/var/www/chronos-updates`）、`deploy/nginx-chronos.conf`（新增 `location /chronos/updates/` → alias `/var/www/chronos-updates/`，no-cache）。
+- 改动目的：在保持源码私有的前提下让桌面端自动更新可用——更新源自托管到用户服务器，应用改用 generic provider 拉取。
+- 验证结果：`npm run build --workspace client` 通过；workflow YAML 通过 `yaml.safe_load` 校验。
+- 服务器准备（需用户一次性执行）：`sudo mkdir -p /var/www/chronos-updates && sudo chown -R <DEPLOY_USER>:<DEPLOY_USER> /var/www/chronos-updates`；nginx 加 `/chronos/updates/` location 后 `nginx -t && systemctl reload nginx`。
+- 限制（引导问题）：当前已安装的 v2.0.0/v1.0.1 仍指向旧 GitHub 源，无法自动升到 2.0.1，需手动安装一次 2.0.1；此后 2.0.2+ 才会从自托管源自动更新。
+
+## 2026-06-21 收尾阶段 7（深色/头像/AI/计时器/排序/统计/标题 9 项打磨）
+
+- 与「收尾阶段 6」同分支（vincent/desktop-update-selfhost），随 2.0.1 一并发布。
+- 改动文件：
+  - 深色模式黑灰化（#1）：`client/src/styles/global.css`（`.dark` 面板/文字/描边改中性黑灰，强调色收敛为低调青并大幅降低投影；深色下禁用 `.app-aurora` 氛围光，消除蓝色光晕）。
+  - 侧栏头像贴合 + 悬停账号弹窗（#2）：`client/src/components/AppLayout.tsx`（新增 `SidebarUser`：渐变首字母圆形头像贴合窄栏；悬停/聚焦弹出账号信息卡，含「切换账号」「退出登录」）。
+  - AI 模型分工 + 每周建议每日缓存（#3）：`AiProviderFactory` 新增 `getBreakdownProvider`(pro)/`getAdviceProvider`(flash) 与 `breakdown-model/advice-model/breakdown-reasoning` 配置；`ChatCompletionRequest` 增 `reasoningEffort`（保留 5 参兼容构造器），`DeepSeekProvider` 透传 `reasoning_effort`；`AiService.previewBreakdownTree` 用 pro+high，`generateWeeklyAdvice` 用 flash 且当天已生成则返回缓存（不再每次进看板重复调用）；`application.yml` 增对应配置。
+  - 拆解截止日期优化（#4）：`AiBreakdownPage`（`taskDueDate` 把任务分散到各阶段时间窗内、避免同日堆积；提交时间由 23:59 改 20:00）；`AiService` 拆解 prompt 强调循序渐进、时间分散、合理时长。
+  - 删除多余文案（#5）：`AiBreakdownPage` 去掉「目标项目」字段的 hint，恢复与「计划周期」对称。
+  - 专注计时器美化（#6）：`LearningLogsPage` 活跃计时改为居中专注光环（呼吸脉冲环 + 渐变计时数字 + 闪烁「专注中」）。
+  - 任务排序 + 完成对号动画（#7）：`useTasks` 排序改为先按截止时间、再按先后顺序（AI 拆解顺序经分散的截止日期体现）；`TasksPage` 新增醒目 `TaskCheck`（空心圆/实心对号，完成时弹性对号 + 扩散光环），完成标题加删除线。
+  - 完成度/统计修复（#8）：`ProjectsPage` 项目完成度改按真实任务（已完成/未归档总数）计算、无任务回落手填进度，平均进度同源；`StatsService` 项目分布的 total/completed 改按全部任务（投入时长仍按本周）；`StatsPage` 时间分布只展示本周有时长的项目、项目进度只展示有任务的项目。
+  - 页面标题去重复（#9）：`PageHeader` 标题前置渐变竖条；各页移除 eyebrow 小标签，仅保留单一标题；项目页标题与导航统一为「项目管理」。
+- 改动目的：按用户本轮 9 项要求做深色配色、账号交互、AI 模型分工与省 token、拆解日期合理化、计时器观感、任务排序与完成反馈、统计正确性、标题去冗余等打磨。
+- 验证结果：前端 `npm run build --workspace client` 通过；`cd client && npx vitest run` 全绿（25 文件 / 68 测试）；后端 `.\server\mvnw.cmd test` 68 测试中仅 `MySqlSaTokenDaoTests.treatsExpiredTokenAsMissing` 偶发失败（H2 MySQL 模式 TIMESTAMP 对 timeout=0 的秒级四舍五入边界，单独重跑 2/2 通过），与本轮改动无关。
+- 判断与待办：模型名（deepseek-v4-pro/flash）与 (high) 推理强度为可配置项，无 Key 时仍回落 Mock；每周建议改为后端当天缓存（前端仍只在进入看板时请求）；任务「AI 拆解顺序」未在后端持久化 orderIndex，靠递增的截止日期体现先后。

@@ -1,6 +1,6 @@
 {
   "name": "@chronos/client",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "Chronos Electron + React + Vite 前端脚手架。",
   "author": "Vincent",
@@ -86,9 +86,8 @@
     },
     "publish": [
       {
-        "provider": "github",
-        "owner": "Vincent-Ctrl-18",
-        "repo": "Chronos"
+        "provider": "generic",
+        "url": "https://vincentt.xyz/chronos/updates/"
       }
     ]
   }
