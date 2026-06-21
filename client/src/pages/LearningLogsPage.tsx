@@ -5,6 +5,8 @@ import {
   IconClock,
   IconEdit,
   IconLogs,
+  IconPause,
+  IconPlay,
   IconPlus,
   IconRefresh,
   IconSearch,
@@ -69,7 +71,7 @@ function difficultyText(value?: 1 | 2 | 3 | 4 | 5): string {
 
 export function LearningLogsPage() {
   const { logs, loading, error, createManualLog, updateManualLog, deleteManualLog, refresh } = useLearningLogs();
-  const { timer, startTimer, stopTimer, discardTimer, clearError } = useTimer();
+  const { timer, startTimer, pauseTimer, resumeTimer, stopTimer, discardTimer, clearError } = useTimer();
   const { projects } = useProjects();
   const { tasks } = useTasks();
   const { offline } = useAuth();
@@ -208,7 +210,7 @@ export function LearningLogsPage() {
             <IconLogs size={19} />
           </span>
           <div>
-            <p className="text-xl font-bold text-ink">{manualCount}</p>
+            <p className="font-serif text-2xl font-bold tabular-nums text-ink">{manualCount}</p>
             <p className="text-[0.78rem] text-muted">手动日志</p>
           </div>
         </Card>
@@ -217,7 +219,7 @@ export function LearningLogsPage() {
             <IconTimer size={19} />
           </span>
           <div>
-            <p className="text-xl font-bold text-ink">{timerCount}</p>
+            <p className="font-serif text-2xl font-bold tabular-nums text-ink">{timerCount}</p>
             <p className="text-[0.78rem] text-muted">计时记录</p>
           </div>
         </Card>
@@ -226,7 +228,7 @@ export function LearningLogsPage() {
             <IconCheckCircle size={19} />
           </span>
           <div>
-            <p className="text-xl font-bold text-ink">{totalMinutes}</p>
+            <p className="font-serif text-2xl font-bold tabular-nums text-ink">{totalMinutes}</p>
             <p className="text-[0.78rem] text-muted">累计分钟</p>
           </div>
         </Card>
@@ -250,28 +252,45 @@ export function LearningLogsPage() {
         )}
 
         {!timer.restoring && timer.active ? (
-          <div className="flex flex-col items-center gap-5 py-3">
-            {/* 专注光环：呼吸式脉冲 + 渐变计时数字 */}
-            <div className="relative grid h-44 w-44 place-items-center">
-              {[0, 1].map((i) => (
-                <motion.span
-                  key={i}
-                  aria-hidden
-                  className="absolute inset-0 rounded-full border-2 border-focus/30"
-                  initial={{ scale: 0.85, opacity: 0.55 }}
-                  animate={{ scale: 1.28, opacity: 0 }}
-                  transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut", delay: i * 1.2 }}
-                />
-              ))}
-              <div
-                className="relative grid h-40 w-40 place-items-center rounded-full border border-focus/30 bg-panel-muted/40 backdrop-blur-sm"
+          <div className="flex flex-col items-center gap-5 py-4">
+            {/* 专注光环：运行时缓慢旋转的渐变弧 + 呼吸脉冲；暂停时静止收敛 */}
+            <div className="relative grid h-48 w-48 place-items-center">
+              {timer.paused ? null : (
+                [0, 1].map((i) => (
+                  <motion.span
+                    key={i}
+                    aria-hidden
+                    className="absolute inset-3 rounded-full border border-focus/25"
+                    initial={{ scale: 0.9, opacity: 0.5 }}
+                    animate={{ scale: 1.26, opacity: 0 }}
+                    transition={{ duration: 2.8, repeat: Infinity, ease: "easeOut", delay: i * 1.4 }}
+                  />
+                ))
+              )}
+              <motion.span
+                aria-hidden
+                className="absolute inset-0 rounded-full border-[3px] border-transparent"
                 style={{
-                  boxShadow: "inset 0 0 28px color-mix(in srgb, var(--focus) 16%, transparent)",
+                  borderTopColor: "var(--focus)",
+                  borderRightColor: "color-mix(in srgb, var(--accent) 55%, transparent)",
+                }}
+                animate={timer.paused ? { rotate: 0 } : { rotate: 360 }}
+                transition={
+                  timer.paused
+                    ? { duration: 0.4, ease: "easeOut" }
+                    : { duration: 7, repeat: Infinity, ease: "linear" }
+                }
+              />
+              <div
+                className="relative grid h-40 w-40 place-items-center rounded-full border border-line/60 bg-panel-muted/40 backdrop-blur-sm transition-opacity"
+                style={{
+                  boxShadow: "inset 0 0 30px color-mix(in srgb, var(--focus) 14%, transparent)",
+                  opacity: timer.paused ? 0.78 : 1,
                 }}
               >
                 <div className="text-center">
                   <div
-                    className="font-mono text-[2rem] font-bold tabular-nums tracking-tight"
+                    className="font-mono text-[2.05rem] font-bold tabular-nums tracking-tight"
                     style={{
                       background: "linear-gradient(135deg, var(--focus), var(--accent))",
                       WebkitBackgroundClip: "text",
@@ -281,13 +300,25 @@ export function LearningLogsPage() {
                   >
                     {formatDuration(timer.elapsedSeconds)}
                   </div>
-                  <div className="mt-1 flex items-center justify-center gap-1.5 text-[0.74rem] font-medium text-focus">
-                    <motion.span
-                      className="inline-block h-1.5 w-1.5 rounded-full bg-focus"
-                      animate={{ opacity: [1, 0.25, 1] }}
-                      transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-                    />
-                    专注中
+                  <div
+                    className="mt-1 flex items-center justify-center gap-1.5 text-[0.74rem] font-medium"
+                    style={{ color: timer.paused ? "var(--muted)" : "var(--focus)" }}
+                  >
+                    {timer.paused ? (
+                      <>
+                        <IconPause size={13} />
+                        已暂停
+                      </>
+                    ) : (
+                      <>
+                        <motion.span
+                          className="inline-block h-1.5 w-1.5 rounded-full bg-focus"
+                          animate={{ opacity: [1, 0.25, 1] }}
+                          transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                        />
+                        专注中
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -299,11 +330,22 @@ export function LearningLogsPage() {
             </div>
 
             <div className="flex flex-wrap justify-center gap-2">
+              {timer.paused ? (
+                <Button variant="secondary" onClick={resumeTimer}>
+                  <IconPlay size={15} />
+                  继续
+                </Button>
+              ) : (
+                <Button variant="secondary" onClick={pauseTimer}>
+                  <IconPause size={15} />
+                  暂停
+                </Button>
+              )}
               <Button onClick={stopTimer}>
                 <IconCheckCircle size={15} />
                 停止并保存
               </Button>
-              <Button variant="secondary" onClick={discardTimer}>
+              <Button variant="ghost" onClick={discardTimer}>
                 丢弃
               </Button>
             </div>

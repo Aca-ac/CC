@@ -38,25 +38,27 @@ export function StatCard({
   return (
     <article
       className={cn(
-        "group flex items-center gap-3 rounded-lg border border-line bg-panel px-3.5 py-3 shadow-soft",
+        "group flex items-center justify-between gap-3 rounded-lg border border-line bg-panel px-4 py-3.5 shadow-soft",
         "transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-float",
         className
       )}
     >
-      <span
-        className={cn(
-          "grid h-10 w-10 shrink-0 place-items-center rounded-md border border-line/60",
-          iconTones[tone]
-        )}
-      >
-        <Icon size={19} strokeWidth={1.8} />
-      </span>
-      <div className="min-w-0">
-        <div className="text-[1.5rem] font-bold leading-none text-ink">
-          <AnimatedNumber value={value} decimals={decimals} suffix={suffix} />
+      <div className="flex min-w-0 items-center gap-3">
+        <span
+          className={cn(
+            "grid h-10 w-10 shrink-0 place-items-center rounded-md border border-line/60",
+            iconTones[tone]
+          )}
+        >
+          <Icon size={19} strokeWidth={1.8} />
+        </span>
+        <div className="min-w-0">
+          <div className="truncate text-[0.86rem] font-medium text-ink">{label}</div>
+          {hint && <div className="mt-0.5 truncate text-[0.72rem] text-muted/80">{hint}</div>}
         </div>
-        <div className="mt-1 truncate text-[0.8rem] text-muted">{label}</div>
-        {hint && <div className="mt-0.5 truncate text-[0.72rem] text-muted/80">{hint}</div>}
+      </div>
+      <div className="shrink-0 font-serif text-[2.15rem] font-bold leading-none text-ink tabular-nums">
+        <AnimatedNumber value={value} decimals={decimals} suffix={suffix} />
       </div>
     </article>
   );

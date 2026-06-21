@@ -47,8 +47,15 @@ export function useProjects(): UseProjectsReturn {
     try {
       if (navigator.onLine && accountId !== "local") {
         const remote = await apiClient.listProjects();
+        // 本地已软删除但尚未同步到服务端的项目：不要被服务端列表「复活」。
+        const pendingDeletes = new Set(
+          (await outboxRepository.findPending(accountId))
+            .filter((m) => m.entityType === "PROJECT" && m.operation === "DELETE")
+            .map((m) => m.entityId)
+        );
         // 将远端数据写入本地 IndexedDB（简单覆盖策略）
         for (const r of remote) {
+          if (pendingDeletes.has(r.id)) continue;
           const existing = await projectRepository.findById(r.id);
           const value: ProjectValue = {
             ...r,

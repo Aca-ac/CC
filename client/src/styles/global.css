@@ -11,6 +11,9 @@
 @theme {
   --font-sans: "Inter Variable", "Segoe UI", system-ui, -apple-system,
     "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  /* 统计大数字专用衬线字族（宋体系），让关键指标更醒目、有质感。 */
+  --font-serif: "Georgia", "Times New Roman", "Songti SC", "SimSun", "宋体",
+    "Noto Serif SC", serif;
 
   --color-surface: var(--surface);
   --color-panel: var(--panel);
