@@ -197,3 +197,16 @@
 - 改动目的：在保留差量下载（减轻服务器压力）的前提下，根治下载卡 0%（代理不兼容 multipart 时整包兜底），并消除发布窗口导致的检测/下载不稳定；同时打磨更新交互动画。
 - 验证结果：app `tsc -p tsconfig.app.json` 通过；`npx vitest run` 见提交说明（main.ts 属 electron，本地无 electron-updater 不参与 app typecheck，CI `npm ci` 覆盖）。
 - 判断与待办：看门狗回退仅对「装有此版本(≥2.0.3)的客户端发起的下载」生效——当前卡住的旧版本需手动安装一次 2.0.3 安装包打破循环；之后差量优先 + 整包兜底自动生效。
+
+## 2026-06-22 收尾阶段（卡片数字/侧栏居中/计时器楷体滚动/删除根因/看板数据 5 项修复）
+
+- 分支 `fix/desktop-update-reliability`（续接上轮，随下个版本一并发布），bump 客户端到 **2.0.4**。
+- 改动文件：
+  - 卡片数字观感修复（#1）：`client/src/components/ui/StatCard.tsx` 大号数字加 `lining-nums`（修 Georgia 旧式数字纵向被压缩），量词（suffix）移出衬线 span、用默认无衬线小字呈现并与数字基线对齐，突出「数据本体」。
+  - 侧栏图标整体居中（#2）：`AppLayout` 导航在窄栏（收起态）下 `flex-1 justify-center` 垂直居中；选中胶囊收起态由靠左改为 `left-1/2 -translate-x-1/2` 水平居中。
+  - 专注计时器重做（#3）：`LearningLogsPage` 新增 `RollingDigit`/`RollingTime`（0-9 纵向滚动翻牌的时间数字）；活跃计时背景由旋转弧/脉冲环改为两团漂浮柔光气团（focus/accent，缓慢漂移呼吸，暂停时收敛调暗）；时间改用楷体（新增 `--font-kai` 字族）+ 柔光，保留「专注中/已暂停」状态与暂停/继续/停止/丢弃按钮。
+  - 项目删除复活根因修复（#4）：`server/.../sync/SyncService.java` 三处 DELETE 由 `setDeletedAt()+updateById()` 改为 `deleteById()`——`@TableLogic` 字段在 `updateById` 时被忽略，旧写法根本没软删（刷新即「复活」）；项目 DELETE 级联软删其任务与学习日志。`client/src/hooks/useProjects.ts` 删除项目时本地级联软删 + 入队该项目下所有任务的 TASK DELETE，避免任务残留。
+  - 看板数据显示修复（#5）：`server/.../dashboard/DashboardService.java` 累计完成改为全部 DONE（去掉按今日 updatedAt 过滤），专注时长改按 `userId` 直接统计专注会话（旧的 task→project 关联会漏掉未关联任务的专注，导致恒为 0）；`client/src/hooks/useDashboard.ts` 在线分支改为「先 loadLocal、最后用服务端权威统计覆盖」（移除会清掉服务端 summary 的 finally-loadLocal），并跳过待同步 DELETE 的任务；`DashboardPage` 专注分钟改为「专注时长」（<60 分显示分钟、≥60 分显示小时保留 1 位），各卡片量词（个/个/小时|分钟/天）。
+- 改动目的：按用户本轮 5 项要求修复卡片数字观感与量词、侧栏图标居中、计时器优雅度（楷体滚动 + 柔光背景）、项目删除无效根因、看板专注时长与连续打卡显示。
+- 验证结果：app `tsc -p tsconfig.app.json --noEmit` 通过；`npx vitest run` 全绿（25 文件 / 68 测试）；后端 `mvnw --offline compile` 通过。
+- 判断与待办：#4 根因为 `@TableLogic` 被 `updateById` 忽略——任何「软删」逻辑都必须走 `deleteById`；连续打卡仍取后端 `habitStreak`（本地 summary 计算缺打卡数据故为 0，在线时由服务端覆盖）。

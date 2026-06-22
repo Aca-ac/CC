@@ -148,8 +148,11 @@ function SidebarContent({
         </div>
       )}
 
-      {/* Nav */}
-      <nav className="flex flex-col gap-1" aria-label="主导航">
+      {/* Nav — 窄栏（收起态）下整体垂直居中排列 */}
+      <nav
+        className={cn("flex flex-col gap-1", !expanded && "flex-1 justify-center")}
+        aria-label="主导航"
+      >
         {navigation.map((item) => {
           const Icon = item.icon;
           return (
@@ -173,7 +176,9 @@ function SidebarContent({
                       layoutId="nav-active-pill"
                       className={cn(
                         "absolute rounded-md shadow-[0_3px_10px_var(--accent-shadow)]",
-                        expanded ? "inset-0" : "left-1 top-1/2 h-9 w-9 -translate-y-1/2"
+                        expanded
+                          ? "inset-0"
+                          : "left-1/2 top-1/2 h-10 w-10 -translate-x-1/2 -translate-y-1/2"
                       )}
                       style={{ background: "linear-gradient(135deg, var(--grad-from), var(--grad-to))" }}
                       transition={{ type: "spring", stiffness: 420, damping: 34 }}

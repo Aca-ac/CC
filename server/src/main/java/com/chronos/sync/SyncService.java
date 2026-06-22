@@ -177,8 +177,13 @@ public class SyncService extends ServiceImpl<SyncRecordMapper, SyncRecord> {
         }
         if ("DELETE".equals(dto.changeType())) {
             if (project != null) {
-                project.setDeletedAt(LocalDateTime.now());
-                projectMapper.updateById(project);
+                // 必须用 deleteById 走逻辑删除：@TableLogic 字段在 updateById 时会被忽略，
+                // 直接 set deletedAt + updateById 不会真正软删（导致刷新后项目「复活」）。
+                projectMapper.deleteById(project.getId());
+                // 级联软删除该项目下的任务与学习日志，避免删项目后任务/日志残留。
+                taskMapper.delete(new LambdaQueryWrapper<Task>().eq(Task::getProjectId, project.getId()));
+                learningLogMapper.delete(
+                        new LambdaQueryWrapper<LearningLog>().eq(LearningLog::getProjectId, project.getId()));
             }
             return;
         }
@@ -215,8 +220,7 @@ public class SyncService extends ServiceImpl<SyncRecordMapper, SyncRecord> {
         if ("DELETE".equals(dto.changeType())) {
             if (task != null) {
                 assertProjectOwned(userId, task.getProjectId());
-                task.setDeletedAt(LocalDateTime.now());
-                taskMapper.updateById(task);
+                taskMapper.deleteById(task.getId());
             }
             return;
         }
@@ -268,8 +272,7 @@ public class SyncService extends ServiceImpl<SyncRecordMapper, SyncRecord> {
         if ("DELETE".equals(dto.changeType())) {
             if (logEntry != null) {
                 assertProjectOwned(userId, logEntry.getProjectId());
-                logEntry.setDeletedAt(LocalDateTime.now());
-                learningLogMapper.updateById(logEntry);
+                learningLogMapper.deleteById(logEntry.getId());
             }
             return;
         }

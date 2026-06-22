@@ -14,6 +14,8 @@
   /* 统计大数字专用衬线字族（宋体系），让关键指标更醒目、有质感。 */
   --font-serif: "Georgia", "Times New Roman", "Songti SC", "SimSun", "宋体",
     "Noto Serif SC", serif;
+  /* 专注计时器楷体字族，配合滚动数字呈现更优雅的书写感。 */
+  --font-kai: "Kaiti SC", "STKaiti", "KaiTi", "楷体", "Kaiti TC", "Noto Serif SC", serif;
 
   --color-surface: var(--surface);
   --color-panel: var(--panel);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { taskRepository } from "../storage/repositories/taskRepository";
+import { outboxRepository } from "../storage/repositories/outboxRepository";
 import { apiClient } from "../services/apiClient";
 import { useAccountId } from "./useAccountId";
 import type { DashboardSummary, Task } from "../types/domain";
@@ -83,7 +84,14 @@ export function useDashboard(): UseDashboardReturn {
         const remoteSummary = await apiClient.getTodayDashboard();
         // 拉取远端任务列表并合并到本地
         const remoteTasks = await apiClient.listTasks();
+        // 跳过本地仍待同步删除的任务，避免被服务端列表「复活」。
+        const pendingDeletes = new Set(
+          (await outboxRepository.findPending(accountId))
+            .filter((m) => m.entityType === "TASK" && m.operation === "DELETE")
+            .map((m) => m.entityId)
+        );
         for (const r of remoteTasks) {
+          if (pendingDeletes.has(r.id)) continue;
           const existing = await taskRepository.findById(r.id);
           const value: TaskValue = {
             ...r,
@@ -99,22 +107,18 @@ export function useDashboard(): UseDashboardReturn {
             await taskRepository.create(value);
           }
         }
-        // 用本地计算刷新 summary，确保本地编辑立即反映
+        // 先用本地计算刷新 todayTasks/summary，确保本地编辑立即反映……
         await loadLocal();
-        // 用远端 summary 校正数字（如果服务端返回了更准确的统计）
-        setSummary((prev) => ({
-          ...prev,
-          todayTaskTotal: remoteSummary.todayTaskTotal,
-          completedTaskTotal: remoteSummary.completedTaskTotal,
-          focusMinutes: remoteSummary.focusMinutes,
-          habitStreak: remoteSummary.habitStreak,
-          syncPendingTotal: remoteSummary.syncPendingTotal,
-        }));
+        // ……再用服务端权威统计覆盖数字（连续打卡、专注时长等本地无法准确计算）。
+        // 注意：此覆盖必须是最后一次 setSummary，不能再被 loadLocal 清掉。
+        setSummary((prev) => ({ ...prev, ...remoteSummary }));
+      } else {
+        await loadLocal();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-    } finally {
       await loadLocal();
+    } finally {
       setLoading(false);
     }
   }, [accountId, loadLocal]);
