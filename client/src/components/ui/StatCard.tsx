@@ -57,8 +57,16 @@ export function StatCard({
           {hint && <div className="mt-0.5 truncate text-[0.72rem] text-muted/80">{hint}</div>}
         </div>
       </div>
-      <div className="shrink-0 font-serif text-[2.15rem] font-bold leading-none text-ink tabular-nums">
-        <AnimatedNumber value={value} decimals={decimals} suffix={suffix} />
+      <div className="flex shrink-0 items-baseline gap-1">
+        <span
+          className="font-serif text-[2.05rem] font-bold text-ink"
+          style={{ lineHeight: 1.15, fontVariantNumeric: "lining-nums tabular-nums" }}
+        >
+          <AnimatedNumber value={value} decimals={decimals} />
+        </span>
+        {suffix && (
+          <span className="text-[0.95rem] font-medium text-muted">{suffix.trim()}</span>
+        )}
       </div>
     </article>
   );

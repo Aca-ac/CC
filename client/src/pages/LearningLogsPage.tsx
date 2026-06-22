@@ -55,6 +55,42 @@ function formatDuration(seconds: number): string {
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
+// 滚动数字：0-9 纵向排列，按目标数字平移，呈现翻牌般的过渡。
+function RollingDigit({ digit }: { digit: number }) {
+  return (
+    <span className="relative inline-block h-[1em] w-[0.62em] overflow-hidden align-baseline">
+      <motion.span
+        className="absolute inset-x-0 top-0 flex flex-col items-center"
+        animate={{ y: `${-digit}em` }}
+        transition={{ type: "spring", stiffness: 240, damping: 28 }}
+      >
+        {Array.from({ length: 10 }, (_, n) => (
+          <span key={n} className="flex h-[1em] items-center justify-center leading-[1em]">
+            {n}
+          </span>
+        ))}
+      </motion.span>
+    </span>
+  );
+}
+
+// 将时间文本拆分：数字走滚动效果，分隔符静态呈现。
+function RollingTime({ text }: { text: string }) {
+  return (
+    <span className="inline-flex items-baseline">
+      {text.split("").map((ch, i) =>
+        /\d/.test(ch) ? (
+          <RollingDigit key={i} digit={Number(ch)} />
+        ) : (
+          <span key={i} className="inline-block px-[0.04em] opacity-70">
+            {ch}
+          </span>
+        )
+      )}
+    </span>
+  );
+}
+
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleString("zh-CN", {
     month: "2-digit",
@@ -253,73 +289,76 @@ export function LearningLogsPage() {
 
         {!timer.restoring && timer.active ? (
           <div className="flex flex-col items-center gap-5 py-4">
-            {/* 专注光环：运行时缓慢旋转的渐变弧 + 呼吸脉冲；暂停时静止收敛 */}
-            <div className="relative grid h-48 w-48 place-items-center">
-              {timer.paused ? null : (
-                [0, 1].map((i) => (
-                  <motion.span
-                    key={i}
-                    aria-hidden
-                    className="absolute inset-3 rounded-full border border-focus/25"
-                    initial={{ scale: 0.9, opacity: 0.5 }}
-                    animate={{ scale: 1.26, opacity: 0 }}
-                    transition={{ duration: 2.8, repeat: Infinity, ease: "easeOut", delay: i * 1.4 }}
-                  />
-                ))
-              )}
+            {/* 专注场景：漂浮的柔光气团作背景动效，楷体滚动数字呈现时间；暂停时收敛、调暗 */}
+            <div className="relative grid h-52 w-full max-w-sm place-items-center overflow-hidden rounded-2xl border border-line/50 bg-panel-muted/30">
               <motion.span
                 aria-hidden
-                className="absolute inset-0 rounded-full border-[3px] border-transparent"
+                className="pointer-events-none absolute h-44 w-44 rounded-full blur-3xl"
                 style={{
-                  borderTopColor: "var(--focus)",
-                  borderRightColor: "color-mix(in srgb, var(--accent) 55%, transparent)",
+                  background:
+                    "radial-gradient(circle, color-mix(in srgb, var(--focus) 55%, transparent), transparent 70%)",
                 }}
-                animate={timer.paused ? { rotate: 0 } : { rotate: 360 }}
+                animate={
+                  timer.paused
+                    ? { x: -28, y: -8, scale: 0.9, opacity: 0.22 }
+                    : { x: [-42, 28, -18, -42], y: [-18, 12, 24, -18], scale: [1, 1.14, 0.94, 1], opacity: 0.42 }
+                }
                 transition={
                   timer.paused
-                    ? { duration: 0.4, ease: "easeOut" }
-                    : { duration: 7, repeat: Infinity, ease: "linear" }
+                    ? { duration: 0.8, ease: "easeOut" }
+                    : { duration: 14, repeat: Infinity, ease: "easeInOut" }
                 }
               />
-              <div
-                className="relative grid h-40 w-40 place-items-center rounded-full border border-line/60 bg-panel-muted/40 backdrop-blur-sm transition-opacity"
+              <motion.span
+                aria-hidden
+                className="pointer-events-none absolute h-40 w-40 rounded-full blur-3xl"
                 style={{
-                  boxShadow: "inset 0 0 30px color-mix(in srgb, var(--focus) 14%, transparent)",
-                  opacity: timer.paused ? 0.78 : 1,
+                  background:
+                    "radial-gradient(circle, color-mix(in srgb, var(--accent) 50%, transparent), transparent 70%)",
                 }}
-              >
-                <div className="text-center">
-                  <div
-                    className="font-mono text-[2.05rem] font-bold tabular-nums tracking-tight"
-                    style={{
-                      background: "linear-gradient(135deg, var(--focus), var(--accent))",
-                      WebkitBackgroundClip: "text",
-                      backgroundClip: "text",
-                      color: "transparent",
-                    }}
-                  >
-                    {formatDuration(timer.elapsedSeconds)}
-                  </div>
-                  <div
-                    className="mt-1 flex items-center justify-center gap-1.5 text-[0.74rem] font-medium"
-                    style={{ color: timer.paused ? "var(--muted)" : "var(--focus)" }}
-                  >
-                    {timer.paused ? (
-                      <>
-                        <IconPause size={13} />
-                        已暂停
-                      </>
-                    ) : (
-                      <>
-                        <motion.span
-                          className="inline-block h-1.5 w-1.5 rounded-full bg-focus"
-                          animate={{ opacity: [1, 0.25, 1] }}
-                          transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-                        />
-                        专注中
-                      </>
-                    )}
-                  </div>
+                animate={
+                  timer.paused
+                    ? { x: 28, y: 8, scale: 0.9, opacity: 0.18 }
+                    : { x: [40, -24, 18, 40], y: [20, -14, -24, 20], scale: [1, 0.92, 1.12, 1], opacity: 0.38 }
+                }
+                transition={
+                  timer.paused
+                    ? { duration: 0.8, ease: "easeOut" }
+                    : { duration: 16, repeat: Infinity, ease: "easeInOut" }
+                }
+              />
+
+              <div className="relative z-10 text-center">
+                <div
+                  className="font-kai text-[3.4rem] font-medium leading-none tracking-wide text-ink transition-opacity duration-500"
+                  style={{
+                    opacity: timer.paused ? 0.6 : 1,
+                    textShadow: timer.paused
+                      ? "none"
+                      : "0 0 26px color-mix(in srgb, var(--focus) 20%, transparent)",
+                  }}
+                >
+                  <RollingTime text={formatDuration(timer.elapsedSeconds)} />
+                </div>
+                <div
+                  className="mt-3 flex items-center justify-center gap-1.5 text-[0.78rem] font-medium tracking-wide"
+                  style={{ color: timer.paused ? "var(--muted)" : "var(--focus)" }}
+                >
+                  {timer.paused ? (
+                    <>
+                      <IconPause size={13} />
+                      已暂停
+                    </>
+                  ) : (
+                    <>
+                      <motion.span
+                        className="inline-block h-1.5 w-1.5 rounded-full bg-focus"
+                        animate={{ opacity: [1, 0.25, 1], scale: [1, 0.8, 1] }}
+                        transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                      />
+                      专注中
+                    </>
+                  )}
                 </div>
               </div>
             </div>

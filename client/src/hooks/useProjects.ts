@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { projectRepository } from "../storage/repositories/projectRepository";
+import { taskRepository } from "../storage/repositories/taskRepository";
 import { outboxRepository } from "../storage/repositories/outboxRepository";
 import { apiClient } from "../services/apiClient";
 import { useAccountId } from "./useAccountId";
@@ -130,11 +131,29 @@ export function useProjects(): UseProjectsReturn {
 
   const deleteProject = useCallback(
     async (id: string) => {
+      // 级联删除该项目下的任务：本地软删 + 入队 TASK DELETE，避免删项目后任务残留/复活。
+      const tasks = await taskRepository.findAll(accountId);
+      for (const t of tasks) {
+        if (t.projectId !== id || t.deleted) continue;
+        await taskRepository.softDelete(t.id);
+        await outboxRepository.create({
+          mutationId: crypto.randomUUID(),
+          accountId,
+          operation: "DELETE",
+          entityType: "TASK",
+          entityId: t.id,
+          payload: JSON.stringify({ id: t.id }),
+          status: "pending",
+          retryCount: 0,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      }
       await projectRepository.softDelete(id);
       await enqueue("DELETE", id, { id });
       setProjects((prev) => prev.filter((p) => p.id !== id));
     },
-    [enqueue]
+    [accountId, enqueue]
   );
 
   useEffect(() => {

@@ -52,11 +52,17 @@ export function DashboardPage() {
   const completion = todayTotal ? Math.round((todayDone / todayTotal) * 100) : 0;
   const upcoming = todayTasks.filter((t) => t.status !== "DONE").slice(0, 6);
 
+  // 专注时长：不足 1 小时按「分钟」，达到 1 小时按「小时」（保留 1 位小数）。
+  const focusIsHours = summary.focusMinutes >= 60;
+  const focusValue = focusIsHours ? Math.round((summary.focusMinutes / 60) * 10) / 10 : summary.focusMinutes;
+  const focusSuffix = focusIsHours ? "小时" : "分钟";
+  const focusLabel = `${focusValue} ${focusSuffix}`;
+
   const stats = [
-    { icon: IconTasks, label: "今日任务", value: summary.todayTaskTotal, tone: "brand" as const },
-    { icon: IconCheckCircle, label: "累计完成", value: summary.completedTaskTotal, tone: "success" as const },
-    { icon: IconClock, label: "专注分钟", value: summary.focusMinutes, tone: "focus" as const },
-    { icon: IconFlame, label: "连续打卡", value: summary.habitStreak, tone: "habit" as const, suffix: " 天" },
+    { icon: IconTasks, label: "今日任务", value: summary.todayTaskTotal, tone: "brand" as const, suffix: "个", decimals: 0 },
+    { icon: IconCheckCircle, label: "累计完成", value: summary.completedTaskTotal, tone: "success" as const, suffix: "个", decimals: 0 },
+    { icon: IconClock, label: "专注时长", value: focusValue, tone: "focus" as const, suffix: focusSuffix, decimals: focusIsHours ? 1 : 0 },
+    { icon: IconFlame, label: "连续打卡", value: summary.habitStreak, tone: "habit" as const, suffix: "天", decimals: 0 },
   ];
 
   return (
@@ -91,7 +97,7 @@ export function DashboardPage() {
               今天还有 {todayTotal - todayDone} 个任务待完成
             </h2>
             <p className="mt-1.5 text-[0.9rem] text-muted">
-              已完成 {todayDone} / {todayTotal} · 专注 {summary.focusMinutes} 分钟。保持节奏，稳步推进。
+              已完成 {todayDone} / {todayTotal} · 专注 {focusLabel}。保持节奏，稳步推进。
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Link to="/logs">
@@ -130,6 +136,7 @@ export function DashboardPage() {
               value={s.value}
               tone={s.tone}
               suffix={s.suffix}
+              decimals={s.decimals}
             />
           </motion.div>
         ))}

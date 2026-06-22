@@ -1,6 +1,6 @@
 {
   "name": "@chronos/client",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "private": true,
   "description": "Chronos Electron + React + Vite 前端脚手架。",
   "author": "Vincent",

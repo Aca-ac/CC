@@ -54,37 +54,25 @@ public class DashboardService {
             ).intValue();
         }
 
-        // 今日已完成任务数
+        // 累计已完成任务数（全部 DONE，对应「累计完成」卡片，而非仅今天）
         int completedTaskTotal = 0;
         if (!projectIds.isEmpty()) {
             completedTaskTotal = taskMapper.selectCount(
                     new LambdaQueryWrapper<Task>()
                             .in(Task::getProjectId, projectIds)
                             .eq(Task::getStatus, TaskStatus.DONE)
-                            .between(Task::getUpdatedAt, startOfDay, endOfDay)
             ).intValue();
         }
 
-        // 今日专注总时长（通过 task → project 关联过滤当前用户的数据）
-        int focusMinutes = 0;
-        if (!projectIds.isEmpty()) {
-            List<Task> userTasks = taskMapper.selectList(
-                    new LambdaQueryWrapper<Task>()
-                            .select(Task::getId)
-                            .in(Task::getProjectId, projectIds)
-            );
-            List<String> taskIds = userTasks.stream().map(Task::getId).collect(Collectors.toList());
-            if (!taskIds.isEmpty()) {
-                List<FocusSession> sessions = focusSessionMapper.selectList(
-                        new LambdaQueryWrapper<FocusSession>()
-                                .in(FocusSession::getTaskId, taskIds)
-                                .between(FocusSession::getStartedAt, startOfDay, endOfDay)
-                );
-                focusMinutes = sessions.stream()
-                        .mapToInt(s -> s.getDurationMinutes() != null ? s.getDurationMinutes() : 0)
-                        .sum();
-            }
-        }
+        // 今日专注总时长：直接按 userId 统计专注会话——计时可不关联任务，
+        // 旧的 task→project 关联会漏掉未选任务的专注会话，导致专注时长恒为 0。
+        int focusMinutes = focusSessionMapper.selectList(
+                new LambdaQueryWrapper<FocusSession>()
+                        .eq(FocusSession::getUserId, userId)
+                        .between(FocusSession::getStartedAt, startOfDay, endOfDay)
+        ).stream()
+                .mapToInt(s -> s.getDurationMinutes() != null ? s.getDurationMinutes() : 0)
+                .sum();
 
         // 最长习惯连续打卡天数
         List<Habit> habits = habitMapper.selectList(
